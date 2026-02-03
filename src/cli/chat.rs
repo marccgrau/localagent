@@ -127,6 +127,7 @@ pub async fn run(args: ChatArgs, agent_id: &str) -> Result<()> {
         match agent.chat_stream(input).await {
             Ok(mut stream) => {
                 let mut full_response = String::new();
+                let mut pending_tool_calls = None;
 
                 while let Some(result) = stream.next().await {
                     match result {
@@ -134,6 +135,11 @@ pub async fn run(args: ChatArgs, agent_id: &str) -> Result<()> {
                             print!("{}", chunk.delta);
                             stdout.flush()?;
                             full_response.push_str(&chunk.delta);
+
+                            // Capture tool calls from the final chunk
+                            if chunk.done && chunk.tool_calls.is_some() {
+                                pending_tool_calls = chunk.tool_calls;
+                            }
                         }
                         Err(e) => {
                             eprintln!("\nStream error: {}", e);
@@ -142,8 +148,26 @@ pub async fn run(args: ChatArgs, agent_id: &str) -> Result<()> {
                     }
                 }
 
-                // Add the response to session history and auto-save
-                agent.finish_chat_stream(&full_response);
+                // Handle tool calls if any
+                if let Some(tool_calls) = pending_tool_calls {
+                    // Show tool execution indicator
+                    println!("\n[Executing {} tool(s)...]", tool_calls.len());
+                    stdout.flush()?;
+
+                    match agent.execute_streaming_tool_calls(&full_response, tool_calls).await {
+                        Ok(follow_up) => {
+                            print!("{}", follow_up);
+                            stdout.flush()?;
+                        }
+                        Err(e) => {
+                            eprintln!("Tool execution error: {}", e);
+                        }
+                    }
+                } else {
+                    // No tool calls - just finish the stream
+                    agent.finish_chat_stream(&full_response);
+                }
+
                 if let Err(e) = agent.auto_save_session() {
                     eprintln!("Warning: Failed to auto-save session: {}", e);
                 }

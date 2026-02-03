@@ -643,9 +643,16 @@ impl LLMProvider for AnthropicProvider {
         }
 
         // Anthropic streams Server-Sent Events (SSE)
+        // We need to track tool_use blocks and accumulate their JSON input
         let stream = async_stream::stream! {
             let mut byte_stream = response.bytes_stream();
             let mut buffer = String::new();
+
+            // Track tool calls being accumulated
+            let mut pending_tool_calls: Vec<ToolCall> = Vec::new();
+            let mut current_tool_id: Option<String> = None;
+            let mut current_tool_name: Option<String> = None;
+            let mut current_tool_input: String = String::new();
 
             while let Some(chunk) = byte_stream.next().await {
                 match chunk {
@@ -661,39 +668,85 @@ impl LLMProvider for AnthropicProvider {
                             for line in event.lines() {
                                 if let Some(data) = line.strip_prefix("data: ") {
                                     if data == "[DONE]" {
+                                        // Return any accumulated tool calls
+                                        let tool_calls = if pending_tool_calls.is_empty() {
+                                            None
+                                        } else {
+                                            Some(pending_tool_calls.clone())
+                                        };
                                         yield Ok(StreamChunk {
                                             delta: String::new(),
                                             done: true,
-                                            tool_calls: None,
+                                            tool_calls,
                                         });
                                         continue;
                                     }
 
                                     if let Ok(json) = serde_json::from_str::<Value>(data) {
-                                        // Handle content_block_delta events (text)
-                                        if json["type"] == "content_block_delta" {
-                                            if let Some(delta) = json["delta"]["text"].as_str() {
+                                        let event_type = json["type"].as_str().unwrap_or("");
+
+                                        match event_type {
+                                            // Text content delta
+                                            "content_block_delta" => {
+                                                // Check if it's text or tool input
+                                                if let Some(delta) = json["delta"]["text"].as_str() {
+                                                    yield Ok(StreamChunk {
+                                                        delta: delta.to_string(),
+                                                        done: false,
+                                                        tool_calls: None,
+                                                    });
+                                                } else if let Some(input_delta) = json["delta"]["partial_json"].as_str() {
+                                                    // Accumulate tool input JSON
+                                                    current_tool_input.push_str(input_delta);
+                                                }
+                                            }
+
+                                            // Tool use block started
+                                            "content_block_start" => {
+                                                if let Some(content_block) = json.get("content_block") {
+                                                    if content_block["type"] == "tool_use" {
+                                                        current_tool_id = content_block["id"].as_str().map(|s| s.to_string());
+                                                        current_tool_name = content_block["name"].as_str().map(|s| s.to_string());
+                                                        current_tool_input.clear();
+                                                    }
+                                                }
+                                            }
+
+                                            // Content block finished
+                                            "content_block_stop" => {
+                                                // If we were accumulating a tool call, finalize it
+                                                if let (Some(id), Some(name)) = (current_tool_id.take(), current_tool_name.take()) {
+                                                    pending_tool_calls.push(ToolCall {
+                                                        id,
+                                                        name,
+                                                        arguments: std::mem::take(&mut current_tool_input),
+                                                    });
+                                                }
+                                            }
+
+                                            // Message complete
+                                            "message_stop" => {
+                                                let tool_calls = if pending_tool_calls.is_empty() {
+                                                    None
+                                                } else {
+                                                    Some(pending_tool_calls.clone())
+                                                };
                                                 yield Ok(StreamChunk {
-                                                    delta: delta.to_string(),
-                                                    done: false,
-                                                    tool_calls: None,
+                                                    delta: String::new(),
+                                                    done: true,
+                                                    tool_calls,
                                                 });
                                             }
-                                        }
-                                        // Handle message_stop event
-                                        else if json["type"] == "message_stop" {
-                                            yield Ok(StreamChunk {
-                                                delta: String::new(),
-                                                done: true,
-                                                tool_calls: None,
-                                            });
-                                        }
-                                        // Handle errors
-                                        else if json["type"] == "error" {
-                                            let error_msg = json["error"]["message"]
-                                                .as_str()
-                                                .unwrap_or("Unknown error");
-                                            yield Err(anyhow::anyhow!("Anthropic error: {}", error_msg));
+
+                                            // Error
+                                            "error" => {
+                                                let error_msg = json["error"]["message"]
+                                                    .as_str()
+                                                    .unwrap_or("Unknown error");
+                                                yield Err(anyhow::anyhow!("Anthropic error: {}", error_msg));
+                                            }
+
+                                            _ => {} // Ignore other events
                                         }
                                     }
                                 }

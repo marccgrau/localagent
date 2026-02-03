@@ -376,6 +376,68 @@ impl Agent {
         });
     }
 
+    /// Execute tool calls that were accumulated during streaming
+    /// Returns the final response after tool execution
+    pub async fn execute_streaming_tool_calls(
+        &mut self,
+        text_response: &str,
+        tool_calls: Vec<ToolCall>,
+    ) -> Result<String> {
+        // Add assistant message with tool calls
+        self.session.add_message(Message {
+            role: Role::Assistant,
+            content: text_response.to_string(),
+            tool_calls: Some(tool_calls.clone()),
+            tool_call_id: None,
+        });
+
+        // Execute each tool and collect results
+        let mut results = Vec::new();
+        for call in &tool_calls {
+            debug!(
+                "Executing tool: {} with args: {}",
+                call.name, call.arguments
+            );
+
+            let result = self.execute_tool(call).await;
+            results.push(ToolResult {
+                call_id: call.id.clone(),
+                output: result.unwrap_or_else(|e| format!("Error: {}", e)),
+            });
+        }
+
+        // Add tool results to session
+        for result in &results {
+            self.session.add_message(Message {
+                role: Role::Tool,
+                content: result.output.clone(),
+                tool_calls: None,
+                tool_call_id: Some(result.call_id.clone()),
+            });
+        }
+
+        // Get follow-up response from LLM
+        let messages = self.session.messages_for_llm();
+        let tool_schemas: Vec<ToolSchema> = self.tools.iter().map(|t| t.schema()).collect();
+        let response = self
+            .provider
+            .chat(&messages, Some(tool_schemas.as_slice()))
+            .await?;
+
+        // Handle the response (may have more tool calls)
+        let final_response = self.handle_response(response).await?;
+
+        // Add final response to session
+        self.session.add_message(Message {
+            role: Role::Assistant,
+            content: final_response.clone(),
+            tool_calls: None,
+            tool_call_id: None,
+        });
+
+        Ok(final_response)
+    }
+
     /// Get a reference to the LLM provider for streaming
     pub fn provider(&self) -> &dyn LLMProvider {
         &*self.provider
