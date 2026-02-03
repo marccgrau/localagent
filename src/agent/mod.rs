@@ -1,6 +1,7 @@
 mod providers;
 mod session;
 mod session_store;
+mod skills;
 mod system_prompt;
 mod tools;
 
@@ -68,13 +69,19 @@ impl Agent {
     pub async fn new_session(&mut self) -> Result<()> {
         self.session = Session::new();
 
+        // Load skills from workspace
+        let workspace_skills = skills::load_skills(self.memory.workspace()).unwrap_or_default();
+        let skills_prompt = skills::build_skills_prompt(&workspace_skills);
+        debug!("Loaded {} skills from workspace", workspace_skills.len());
+
         // Build system prompt with identity, safety, workspace info
         let tool_names: Vec<&str> = self.tools.iter().map(|t| t.name()).collect();
         let system_prompt_params = system_prompt::SystemPromptParams::new(
             self.memory.workspace(),
             &self.config.model,
         )
-        .with_tools(tool_names);
+        .with_tools(tool_names)
+        .with_skills_prompt(skills_prompt);
         let system_prompt = system_prompt::build_system_prompt(system_prompt_params);
 
         // Load memory context (SOUL.md, MEMORY.md, daily logs, HEARTBEAT.md)

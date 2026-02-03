@@ -108,8 +108,9 @@ async fn handle_command(input: &str, agent: &mut Agent) -> CommandResult {
             println!("\nCommands:");
             println!("  /help, /h, /?     - Show this help");
             println!("  /quit, /exit, /q  - Exit chat");
+            println!("  /new              - Start a fresh session (reloads memory context)");
             println!("  /compact          - Compact session history");
-            println!("  /clear            - Clear session history");
+            println!("  /clear            - Clear session history (keeps context)");
             println!("  /memory <query>   - Search memory");
             println!("  /save             - Save current session");
             println!("  /status           - Show session status");
@@ -129,6 +130,14 @@ async fn handle_command(input: &str, agent: &mut Agent) -> CommandResult {
             agent.clear_session();
             println!("\nSession cleared.\n");
             CommandResult::Continue
+        }
+
+        "/new" => match agent.new_session().await {
+            Ok(()) => {
+                println!("\nNew session started. Memory context reloaded.\n");
+                CommandResult::Continue
+            }
+            Err(e) => CommandResult::Error(format!("Failed to create new session: {}", e)),
         }
 
         "/memory" => {

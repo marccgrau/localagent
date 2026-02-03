@@ -44,6 +44,24 @@ pub fn build_system_prompt(params: SystemPromptParams) -> String {
             lines.push(format!("- {}: {}", tool, summary));
         }
         lines.push(String::new());
+
+        // Tool call style guidance
+        lines.push("## Tool Call Style".to_string());
+        lines.push(
+            "Default: do not narrate routine, low-risk tool calls (just call the tool).".to_string(),
+        );
+        lines.push(
+            "Narrate only when it helps: multi-step work, complex problems, sensitive actions \
+             (e.g., deletions), or when the user explicitly asks."
+                .to_string(),
+        );
+        lines.push("Keep narration brief and value-dense.".to_string());
+        lines.push(String::new());
+    }
+
+    // Skills section (if any skills are available)
+    if let Some(ref skills_prompt) = params.skills_prompt {
+        lines.push(skills_prompt.clone());
     }
 
     // Workspace section
@@ -57,6 +75,18 @@ pub fn build_system_prompt(params: SystemPromptParams) -> String {
             .to_string(),
     );
     lines.push(String::new());
+
+    // Current time section
+    if let Some(ref time) = params.current_time {
+        lines.push("## Current Time".to_string());
+        let tz_info = params
+            .timezone
+            .as_ref()
+            .map(|tz| format!(" ({})", tz))
+            .unwrap_or_default();
+        lines.push(format!("Session started: {}{}", time, tz_info));
+        lines.push(String::new());
+    }
 
     // Memory section
     lines.push("## Memory".to_string());
@@ -87,6 +117,13 @@ pub fn build_system_prompt(params: SystemPromptParams) -> String {
         SILENT_REPLY_TOKEN
     ));
     lines.push("- Never wrap it in markdown or code blocks".to_string());
+    lines.push(String::new());
+    lines.push(format!(
+        "Wrong: \"Here's help... {}\"",
+        SILENT_REPLY_TOKEN
+    ));
+    lines.push(format!("Wrong: \"{}\"", SILENT_REPLY_TOKEN));
+    lines.push(format!("Right: {}", SILENT_REPLY_TOKEN));
     lines.push(String::new());
 
     // Heartbeat section (for autonomous task runner)
@@ -124,10 +161,19 @@ pub struct SystemPromptParams<'a> {
     pub model: &'a str,
     pub tool_names: Vec<&'a str>,
     pub hostname: Option<String>,
+    pub current_time: Option<String>,
+    pub timezone: Option<String>,
+    pub skills_prompt: Option<String>,
 }
 
 impl<'a> SystemPromptParams<'a> {
     pub fn new(workspace: &'a Path, model: &'a str) -> Self {
+        use chrono::Local;
+
+        let now = Local::now();
+        let current_time = now.format("%Y-%m-%d %H:%M:%S").to_string();
+        let timezone = now.format("%Z").to_string();
+
         Self {
             workspace_dir: workspace.to_str().unwrap_or("~/.localgpt/workspace"),
             model,
@@ -135,11 +181,25 @@ impl<'a> SystemPromptParams<'a> {
             hostname: std::env::var("HOSTNAME")
                 .or_else(|_| std::env::var("HOST"))
                 .ok(),
+            current_time: Some(current_time),
+            timezone: if timezone.is_empty() {
+                None
+            } else {
+                Some(timezone)
+            },
+            skills_prompt: None,
         }
     }
 
     pub fn with_tools(mut self, tools: Vec<&'a str>) -> Self {
         self.tool_names = tools;
+        self
+    }
+
+    pub fn with_skills_prompt(mut self, prompt: String) -> Self {
+        if !prompt.is_empty() {
+            self.skills_prompt = Some(prompt);
+        }
         self
     }
 }
