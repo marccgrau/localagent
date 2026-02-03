@@ -13,7 +13,6 @@ use axum::{
     routing::{get, post},
     Router,
 };
-use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::convert::Infallible;
@@ -23,7 +22,7 @@ use tokio::sync::Mutex;
 use tower_http::cors::{Any, CorsLayer};
 use tracing::info;
 
-use crate::agent::{Agent, AgentConfig};
+use crate::agent::{Agent, AgentConfig, StreamEvent};
 use crate::config::Config;
 use crate::memory::MemoryManager;
 
@@ -147,7 +146,7 @@ async fn chat(State(state): State<Arc<AppState>>, Json(request): Json<ChatReques
     }
 }
 
-// Streaming chat endpoint (SSE)
+// Streaming chat endpoint (SSE) with tool support
 async fn chat_stream(
     State(state): State<Arc<AppState>>,
     Json(request): Json<ChatRequest>,
@@ -157,26 +156,36 @@ async fn chat_stream(
     let stream = async_stream::stream! {
         let mut agent = agent.lock().await;
 
-        // Add user message
-        agent.add_user_message(&request.message);
+        // Use streaming with tools
+        match agent.chat_stream_with_tools(&request.message).await {
+            Ok(event_stream) => {
+                use futures::StreamExt;
 
-        // Get provider stream
-        let messages = agent.session_messages();
-        match agent.provider().chat_stream(&messages, None).await {
-            Ok(mut response_stream) => {
-                let mut full_response = String::new();
+                // Pin the stream to iterate over it
+                let mut pinned_stream = std::pin::pin!(event_stream);
 
-                while let Some(chunk) = response_stream.next().await {
-                    match chunk {
-                        Ok(c) => {
-                            full_response.push_str(&c.delta);
-                            let data = json!({"delta": c.delta, "done": c.done});
+                while let Some(event) = pinned_stream.next().await {
+                    match event {
+                        Ok(StreamEvent::Content(content)) => {
+                            let data = json!({"type": "content", "delta": content});
                             yield Ok(Event::default().data(data.to_string()));
-
-                            if c.done {
-                                agent.add_assistant_message(&full_response);
-                                break;
-                            }
+                        }
+                        Ok(StreamEvent::ToolCallStart { name, id }) => {
+                            let data = json!({"type": "tool_start", "name": name, "id": id});
+                            yield Ok(Event::default().data(data.to_string()));
+                        }
+                        Ok(StreamEvent::ToolCallEnd { name, id, output }) => {
+                            let data = json!({
+                                "type": "tool_end",
+                                "name": name,
+                                "id": id,
+                                "output": output.chars().take(500).collect::<String>()
+                            });
+                            yield Ok(Event::default().data(data.to_string()));
+                        }
+                        Ok(StreamEvent::Done) => {
+                            let data = json!({"type": "done"});
+                            yield Ok(Event::default().data(data.to_string()));
                         }
                         Err(e) => {
                             yield Ok(Event::default().data(json!({"error": e.to_string()}).to_string()));

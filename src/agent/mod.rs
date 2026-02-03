@@ -6,7 +6,8 @@ mod system_prompt;
 mod tools;
 
 pub use providers::{
-    LLMProvider, LLMResponse, Message, Role, StreamChunk, StreamResult, ToolCall, ToolSchema,
+    LLMProvider, LLMResponse, Message, Role, StreamChunk, StreamEvent, StreamResult, ToolCall,
+    ToolSchema,
 };
 pub use session::{
     get_sessions_dir_for_agent, get_state_dir, Session, SessionStatus, DEFAULT_AGENT_ID,
@@ -370,5 +371,119 @@ impl Agent {
             tool_calls: None,
             tool_call_id: None,
         });
+    }
+
+    /// Stream chat with tool support
+    /// Yields StreamEvent for content chunks and tool executions
+    /// Automatically handles tool calls and continues the conversation
+    pub async fn chat_stream_with_tools(
+        &mut self,
+        message: &str,
+    ) -> Result<impl futures::Stream<Item = Result<StreamEvent>> + '_> {
+        // Add user message
+        self.session.add_message(Message {
+            role: Role::User,
+            content: message.to_string(),
+            tool_calls: None,
+            tool_call_id: None,
+        });
+
+        // Check if we need to compact
+        if self.should_compact() {
+            self.compact_session().await?;
+        }
+
+        Ok(self.stream_with_tool_loop())
+    }
+
+    fn stream_with_tool_loop(&mut self) -> impl futures::Stream<Item = Result<StreamEvent>> + '_ {
+        async_stream::stream! {
+            let max_tool_iterations = 10;
+            let mut iteration = 0;
+
+            loop {
+                iteration += 1;
+                if iteration > max_tool_iterations {
+                    yield Err(anyhow::anyhow!("Max tool iterations exceeded"));
+                    break;
+                }
+
+                // Get tool schemas
+                let tool_schemas: Vec<ToolSchema> = self.tools.iter().map(|t| t.schema()).collect();
+
+                // Build messages for LLM
+                let messages = self.session.messages_for_llm();
+
+                // Try streaming first (without tools since most providers don't support tool streaming)
+                // Then check for tool calls in the response
+                let response = self
+                    .provider
+                    .chat(&messages, Some(tool_schemas.as_slice()))
+                    .await;
+
+                match response {
+                    Ok(LLMResponse::Text(text)) => {
+                        // No tool calls - yield the text and we're done
+                        yield Ok(StreamEvent::Content(text.clone()));
+                        yield Ok(StreamEvent::Done);
+
+                        // Add to session
+                        self.session.add_message(Message {
+                            role: Role::Assistant,
+                            content: text,
+                            tool_calls: None,
+                            tool_call_id: None,
+                        });
+                        break;
+                    }
+                    Ok(LLMResponse::ToolCalls(calls)) => {
+                        // Notify about tool calls
+                        for call in &calls {
+                            yield Ok(StreamEvent::ToolCallStart {
+                                name: call.name.clone(),
+                                id: call.id.clone(),
+                            });
+
+                            // Execute tool
+                            let result = self.execute_tool(call).await;
+                            let output = result.unwrap_or_else(|e| format!("Error: {}", e));
+
+                            yield Ok(StreamEvent::ToolCallEnd {
+                                name: call.name.clone(),
+                                id: call.id.clone(),
+                                output: output.clone(),
+                            });
+
+                            // Add tool result to session
+                            self.session.add_message(Message {
+                                role: Role::Tool,
+                                content: output,
+                                tool_calls: None,
+                                tool_call_id: Some(call.id.clone()),
+                            });
+                        }
+
+                        // Add tool call message to session
+                        self.session.add_message(Message {
+                            role: Role::Assistant,
+                            content: String::new(),
+                            tool_calls: Some(calls),
+                            tool_call_id: None,
+                        });
+
+                        // Continue loop to get next response
+                    }
+                    Err(e) => {
+                        yield Err(e);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    /// Get tool schemas for external use
+    pub fn tool_schemas(&self) -> Vec<ToolSchema> {
+        self.tools.iter().map(|t| t.schema()).collect()
     }
 }

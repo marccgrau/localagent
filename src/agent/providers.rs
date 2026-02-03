@@ -55,6 +55,19 @@ pub struct StreamChunk {
     pub done: bool,
 }
 
+/// Events emitted during streaming with tools
+#[derive(Debug, Clone)]
+pub enum StreamEvent {
+    /// Text content chunk
+    Content(String),
+    /// Tool call started
+    ToolCallStart { name: String, id: String },
+    /// Tool call completed
+    ToolCallEnd { name: String, id: String, output: String },
+    /// Stream completed
+    Done,
+}
+
 pub type StreamResult = Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>>;
 
 #[async_trait]
