@@ -453,13 +453,18 @@ impl Tool for MemoryAppendTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema {
             name: "memory_append".to_string(),
-            description: "Append an entry to today's memory log (memory/YYYY-MM-DD.md)".to_string(),
+            description: "Append content to a memory file. Use MEMORY.md for important persistent facts (user info, preferences, key decisions). Use daily log for session notes.".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
+                    "file": {
+                        "type": "string",
+                        "description": "Target file: 'MEMORY.md' for persistent facts, or 'daily' for today's log (memory/YYYY-MM-DD.md). Default: 'daily'",
+                        "enum": ["MEMORY.md", "daily"]
+                    },
                     "content": {
                         "type": "string",
-                        "description": "The content to append"
+                        "description": "The content to append (markdown format)"
                     }
                 },
                 "required": ["content"]
@@ -473,16 +478,28 @@ impl Tool for MemoryAppendTool {
             .as_str()
             .ok_or_else(|| anyhow::anyhow!("Missing content"))?;
 
-        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-        let memory_dir = self.workspace.join("memory");
-        fs::create_dir_all(&memory_dir)?;
+        let file_target = args["file"].as_str().unwrap_or("daily");
 
-        let path = memory_dir.join(format!("{}.md", today));
+        let path = if file_target == "MEMORY.md" {
+            // Write to MEMORY.md (persistent facts)
+            self.workspace.join("MEMORY.md")
+        } else {
+            // Write to daily log
+            let today = chrono::Local::now().format("%Y-%m-%d").to_string();
+            let memory_dir = self.workspace.join("memory");
+            fs::create_dir_all(&memory_dir)?;
+            memory_dir.join(format!("{}.md", today))
+        };
 
         debug!("Appending to memory: {}", path.display());
 
-        let timestamp = chrono::Local::now().format("%H:%M").to_string();
-        let entry = format!("\n## {}\n\n{}\n", timestamp, content);
+        // Format entry with timestamp for daily logs, just content for MEMORY.md
+        let entry = if file_target == "MEMORY.md" {
+            format!("\n{}\n", content)
+        } else {
+            let timestamp = chrono::Local::now().format("%H:%M").to_string();
+            format!("\n## {}\n\n{}\n", timestamp, content)
+        };
 
         let mut file = fs::OpenOptions::new()
             .create(true)
