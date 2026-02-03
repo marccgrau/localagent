@@ -75,7 +75,7 @@ Key settings:
 - `agent.context_window` / `reserve_tokens` - Context management
 - `heartbeat.interval` - Duration string (e.g., "30m", "1h")
 - `heartbeat.active_hours` - Optional `{start, end}` in "HH:MM" format
-- `server.port` - HTTP server port (default: 18790)
+- `server.port` - HTTP server port (default: 31327)
 
 ## Skills System
 

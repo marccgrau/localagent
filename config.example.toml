@@ -85,7 +85,7 @@ chunk_overlap = 80
 enabled = true
 
 # Port to listen on
-port = 18790
+port = 31327
 
 # Bind address (127.0.0.1 for localhost only)
 bind = "127.0.0.1"

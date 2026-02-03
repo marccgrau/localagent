@@ -63,7 +63,7 @@ workspace = "~/.localgpt/workspace"
 
 [server]
 enabled = true
-port = 18790
+port = 31327
 bind = "127.0.0.1"
 ```
 
@@ -120,4 +120,4 @@ When the daemon is running, the following endpoints are available:
 
 ## License
 
-MIT
+Apache-2.0

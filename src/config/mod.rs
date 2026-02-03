@@ -197,7 +197,7 @@ fn default_chunk_overlap() -> usize {
     80
 }
 fn default_port() -> u16 {
-    18790
+    31327
 }
 fn default_bind() -> String {
     "127.0.0.1".to_string()
