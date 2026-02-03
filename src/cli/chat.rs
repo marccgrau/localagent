@@ -150,8 +150,9 @@ pub async fn run(args: ChatArgs, agent_id: &str) -> Result<()> {
 
                 // Handle tool calls if any
                 if let Some(tool_calls) = pending_tool_calls {
-                    // Show tool execution indicator
-                    println!("\n[Executing {} tool(s)...]", tool_calls.len());
+                    // Show tool execution indicator with tool names
+                    let tool_names: Vec<&str> = tool_calls.iter().map(|tc| tc.name.as_str()).collect();
+                    println!("\n[Executing: {}]", tool_names.join(", "));
                     stdout.flush()?;
 
                     match agent.execute_streaming_tool_calls(&full_response, tool_calls).await {
@@ -294,12 +295,25 @@ async fn handle_command(input: &str, agent: &mut Agent, agent_id: &str) -> Comma
             CommandResult::Continue
         }
 
-        "/new" => match agent.new_session().await {
-            Ok(()) => {
-                println!("\nNew session started. Memory context reloaded.\n");
-                CommandResult::Continue
+        "/new" => {
+            // Save current session to memory before starting new one
+            match agent.save_session_to_memory().await {
+                Ok(Some(path)) => {
+                    println!("\nSession saved to: {}", path.display());
+                }
+                Ok(None) => {} // No messages to save
+                Err(e) => {
+                    eprintln!("Warning: Failed to save session to memory: {}", e);
+                }
             }
-            Err(e) => CommandResult::Error(format!("Failed to create new session: {}", e)),
+
+            match agent.new_session().await {
+                Ok(()) => {
+                    println!("New session started. Memory context reloaded.\n");
+                    CommandResult::Continue
+                }
+                Err(e) => CommandResult::Error(format!("Failed to create new session: {}", e)),
+            }
         }
 
         "/memory" => {

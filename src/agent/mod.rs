@@ -27,6 +27,24 @@ use tracing::{debug, info};
 use crate::config::Config;
 use crate::memory::{MemoryChunk, MemoryManager};
 
+/// Generate a URL-safe slug from text (first 3-5 words, lowercased, hyphenated)
+fn generate_slug(text: &str) -> String {
+    text.split_whitespace()
+        .take(4)
+        .map(|w| {
+            w.chars()
+                .filter(|c| c.is_alphanumeric())
+                .collect::<String>()
+                .to_lowercase()
+        })
+        .filter(|w| !w.is_empty())
+        .collect::<Vec<_>>()
+        .join("-")
+        .chars()
+        .take(30)
+        .collect()
+}
+
 #[derive(Debug, Clone)]
 pub struct AgentConfig {
     pub model: String,
@@ -296,30 +314,102 @@ impl Agent {
         Ok((before, after))
     }
 
+    /// Pre-compaction memory flush - prompts agent to save important info
     async fn memory_flush(&mut self) -> Result<()> {
+        let today = chrono::Local::now().format("%Y-%m-%d").to_string();
         let flush_prompt = format!(
-            "Pre-compaction memory flush.\n\
-             Store durable memories now (use memory/YYYY-MM-DD.md).\n\
+            "Pre-compaction memory flush. Session nearing token limit.\n\
+             If there's anything important to remember, use write_file or edit_file to save to:\n\
+             - MEMORY.md for persistent facts (user info, preferences, key decisions)\n\
+             - memory/{}.md for session notes\n\n\
              If nothing to store, reply: {}",
-            SILENT_REPLY_TOKEN
+            today, SILENT_REPLY_TOKEN
         );
 
-        let messages = vec![Message {
-            role: Role::System,
+        // Add flush prompt as user message
+        self.session.add_message(Message {
+            role: Role::User,
             content: flush_prompt,
             tool_calls: None,
             tool_call_id: None,
-        }];
+        });
 
-        let response = self.provider.chat(&messages, None).await?;
+        // Get tool schemas so agent can write files
+        let tool_schemas: Vec<ToolSchema> = self.tools.iter().map(|t| t.schema()).collect();
+        let messages = self.session.messages_for_llm();
 
-        if let LLMResponse::Text(text) = response {
-            if !is_silent_reply(&text) {
-                debug!("Memory flush response: {}", text);
-            }
+        let response = self.provider.chat(&messages, Some(&tool_schemas)).await?;
+
+        // Handle response (may include tool calls)
+        let final_response = self.handle_response(response).await?;
+
+        // Add response to session
+        self.session.add_message(Message {
+            role: Role::Assistant,
+            content: final_response.clone(),
+            tool_calls: None,
+            tool_call_id: None,
+        });
+
+        if !is_silent_reply(&final_response) {
+            debug!("Memory flush response: {}", final_response);
         }
 
         Ok(())
+    }
+
+    /// Save current session to memory file (called on /new command)
+    /// Creates memory/YYYY-MM-DD-slug.md with session transcript
+    pub async fn save_session_to_memory(&self) -> Result<Option<PathBuf>> {
+        let messages = self.session.user_assistant_messages();
+
+        // Skip if no conversation happened
+        if messages.is_empty() {
+            return Ok(None);
+        }
+
+        // Generate slug from first user message
+        let slug = messages
+            .iter()
+            .find(|m| m.role == Role::User)
+            .map(|m| generate_slug(&m.content))
+            .unwrap_or_else(|| "session".to_string());
+
+        let now = chrono::Local::now();
+        let date_str = now.format("%Y-%m-%d").to_string();
+        let time_str = now.format("%H:%M:%S").to_string();
+
+        // Build memory file content
+        let mut content = format!(
+            "# Session: {} {}\n\n\
+             - **Session ID**: {}\n\n\
+             ## Conversation\n\n",
+            date_str, time_str, self.session.id()
+        );
+
+        for msg in &messages {
+            let role = match msg.role {
+                Role::User => "**User**",
+                Role::Assistant => "**Assistant**",
+                _ => continue,
+            };
+            // Truncate long messages
+            let msg_content: String = msg.content.chars().take(500).collect();
+            let truncated = if msg.content.len() > 500 { "..." } else { "" };
+            content.push_str(&format!("{}: {}{}\n\n", role, msg_content, truncated));
+        }
+
+        // Write to memory/YYYY-MM-DD-slug.md
+        let memory_dir = self.memory.workspace().join("memory");
+        std::fs::create_dir_all(&memory_dir)?;
+
+        let filename = format!("{}-{}.md", date_str, slug);
+        let path = memory_dir.join(&filename);
+
+        std::fs::write(&path, content)?;
+        info!("Saved session to memory: {}", path.display());
+
+        Ok(Some(path))
     }
 
     pub fn clear_session(&mut self) {

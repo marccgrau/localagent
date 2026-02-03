@@ -30,8 +30,7 @@ pub fn create_default_tools(config: &Config) -> Result<Vec<Box<dyn Tool>>> {
         Box::new(ReadFileTool::new()),
         Box::new(WriteFileTool::new()),
         Box::new(EditFileTool::new()),
-        Box::new(MemorySearchTool::new(workspace.clone())),
-        Box::new(MemoryAppendTool::new(workspace)),
+        Box::new(MemorySearchTool::new(workspace)),
         Box::new(WebFetchTool::new()),
     ])
 }
@@ -430,86 +429,6 @@ impl Tool for MemorySearchTool {
         } else {
             Ok(results.join("\n"))
         }
-    }
-}
-
-// Memory Append Tool
-pub struct MemoryAppendTool {
-    workspace: PathBuf,
-}
-
-impl MemoryAppendTool {
-    pub fn new(workspace: PathBuf) -> Self {
-        Self { workspace }
-    }
-}
-
-#[async_trait]
-impl Tool for MemoryAppendTool {
-    fn name(&self) -> &str {
-        "memory_append"
-    }
-
-    fn schema(&self) -> ToolSchema {
-        ToolSchema {
-            name: "memory_append".to_string(),
-            description: "Append content to a memory file. Use MEMORY.md for important persistent facts (user info, preferences, key decisions). Use daily log for session notes.".to_string(),
-            parameters: json!({
-                "type": "object",
-                "properties": {
-                    "file": {
-                        "type": "string",
-                        "description": "Target file: 'MEMORY.md' for persistent facts, or 'daily' for today's log (memory/YYYY-MM-DD.md). Default: 'daily'",
-                        "enum": ["MEMORY.md", "daily"]
-                    },
-                    "content": {
-                        "type": "string",
-                        "description": "The content to append (markdown format)"
-                    }
-                },
-                "required": ["content"]
-            }),
-        }
-    }
-
-    async fn execute(&self, arguments: &str) -> Result<String> {
-        let args: Value = serde_json::from_str(arguments)?;
-        let content = args["content"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing content"))?;
-
-        let file_target = args["file"].as_str().unwrap_or("daily");
-
-        let path = if file_target == "MEMORY.md" {
-            // Write to MEMORY.md (persistent facts)
-            self.workspace.join("MEMORY.md")
-        } else {
-            // Write to daily log
-            let today = chrono::Local::now().format("%Y-%m-%d").to_string();
-            let memory_dir = self.workspace.join("memory");
-            fs::create_dir_all(&memory_dir)?;
-            memory_dir.join(format!("{}.md", today))
-        };
-
-        debug!("Appending to memory: {}", path.display());
-
-        // Format entry with timestamp for daily logs, just content for MEMORY.md
-        let entry = if file_target == "MEMORY.md" {
-            format!("\n{}\n", content)
-        } else {
-            let timestamp = chrono::Local::now().format("%H:%M").to_string();
-            format!("\n## {}\n\n{}\n", timestamp, content)
-        };
-
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&path)?;
-
-        use std::io::Write;
-        file.write_all(entry.as_bytes())?;
-
-        Ok(format!("Appended to {}", path.display()))
     }
 }
 

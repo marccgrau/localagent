@@ -91,14 +91,15 @@ pub fn build_system_prompt(params: SystemPromptParams) -> String {
     // Memory section
     lines.push("## Memory".to_string());
     lines.push("Memory files in the workspace:".to_string());
-    lines.push("- MEMORY.md: Long-term curated knowledge".to_string());
+    lines.push("- MEMORY.md: Long-term curated knowledge (user info, preferences, key decisions)".to_string());
     lines.push("- HEARTBEAT.md: Pending tasks for autonomous execution".to_string());
     lines.push("- SOUL.md: Your persona and tone guidance (if present)".to_string());
-    lines.push("- memory/YYYY-MM-DD.md: Daily logs for ephemeral notes".to_string());
+    lines.push("- memory/YYYY-MM-DD.md: Daily logs for session notes".to_string());
     lines.push(String::new());
     lines.push(
-        "When saving information: use MEMORY.md for important persistent facts, \
-         daily logs for session notes and transient information."
+        "To save information: use write_file or edit_file to update memory files directly. \
+         Use MEMORY.md for important persistent facts (names, preferences). \
+         Sessions are auto-saved to memory/ when starting a new session."
             .to_string(),
     );
     lines.push(String::new());

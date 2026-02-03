@@ -76,6 +76,15 @@ impl Session {
         messages
     }
 
+    /// Get only user and assistant messages (for session memory saving)
+    pub fn user_assistant_messages(&self) -> Vec<Message> {
+        self.messages
+            .iter()
+            .filter(|m| matches!(m.role, Role::User | Role::Assistant))
+            .cloned()
+            .collect()
+    }
+
     pub async fn compact(&mut self, provider: &dyn LLMProvider) -> Result<()> {
         if self.messages.len() < 4 {
             return Ok(()); // Nothing to compact
