@@ -198,4 +198,39 @@ mod tests {
         // Legacy field should also be set
         assert_eq!(entry.claude_cli_session_id, Some("cli-123".to_string()));
     }
+
+    #[test]
+    fn test_session_entry_token_tracking() {
+        let mut entry = SessionEntry::new("test-session");
+
+        // Initially None
+        assert!(entry.input_tokens.is_none());
+        assert!(entry.output_tokens.is_none());
+        assert!(entry.total_tokens.is_none());
+
+        // Set token values
+        entry.input_tokens = Some(100);
+        entry.output_tokens = Some(50);
+        entry.total_tokens = Some(150);
+
+        // Verify they serialize/deserialize correctly
+        let json = serde_json::to_string(&entry).unwrap();
+        let deserialized: SessionEntry = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(deserialized.input_tokens, Some(100));
+        assert_eq!(deserialized.output_tokens, Some(50));
+        assert_eq!(deserialized.total_tokens, Some(150));
+    }
+
+    #[test]
+    fn test_session_entry_defaults() {
+        // Empty JSON should deserialize with defaults
+        let json = r#"{"sessionId": "test", "updatedAt": 0}"#;
+        let entry: SessionEntry = serde_json::from_str(json).unwrap();
+
+        assert_eq!(entry.session_id, "test");
+        assert!(entry.cli_session_ids.is_empty());
+        assert!(entry.input_tokens.is_none());
+        assert!(entry.compaction_count.is_none());
+    }
 }

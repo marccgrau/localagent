@@ -1270,3 +1270,65 @@ impl LLMProvider for ClaudeCliProvider {
 
     // No streaming - uses default fallback (single chunk)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_usage_total() {
+        let usage = Usage {
+            input_tokens: 100,
+            output_tokens: 50,
+        };
+        assert_eq!(usage.total(), 150);
+    }
+
+    #[test]
+    fn test_usage_default() {
+        let usage = Usage::default();
+        assert_eq!(usage.input_tokens, 0);
+        assert_eq!(usage.output_tokens, 0);
+        assert_eq!(usage.total(), 0);
+    }
+
+    #[test]
+    fn test_llm_response_constructors() {
+        // Text response
+        let resp = LLMResponse::text("hello".to_string());
+        assert!(matches!(resp.content, LLMResponseContent::Text(_)));
+        assert!(resp.usage.is_none());
+
+        // Text with usage
+        let usage = Usage {
+            input_tokens: 10,
+            output_tokens: 5,
+        };
+        let resp = LLMResponse::text_with_usage("hello".to_string(), usage);
+        assert!(matches!(resp.content, LLMResponseContent::Text(_)));
+        assert!(resp.usage.is_some());
+        assert_eq!(resp.usage.unwrap().total(), 15);
+
+        // Tool calls
+        let calls = vec![ToolCall {
+            id: "1".to_string(),
+            name: "test".to_string(),
+            arguments: "{}".to_string(),
+        }];
+        let resp = LLMResponse::tool_calls(calls);
+        assert!(matches!(resp.content, LLMResponseContent::ToolCalls(_)));
+        assert!(resp.usage.is_none());
+    }
+
+    #[test]
+    fn test_resolve_model_alias() {
+        assert_eq!(resolve_model_alias("opus"), "anthropic/claude-opus-4-5");
+        assert_eq!(resolve_model_alias("sonnet"), "anthropic/claude-sonnet-4-5");
+        assert_eq!(resolve_model_alias("gpt"), "openai/gpt-4o");
+        assert_eq!(resolve_model_alias("gpt-mini"), "openai/gpt-4o-mini");
+        assert_eq!(
+            resolve_model_alias("custom-model"),
+            "custom-model".to_string()
+        );
+    }
+}
