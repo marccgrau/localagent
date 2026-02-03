@@ -3,6 +3,7 @@ use clap::Args;
 use futures::StreamExt;
 use rustyline::error::ReadlineError;
 use rustyline::DefaultEditor;
+use serde_json::Value;
 use std::io::{self, Write};
 
 use localgpt::agent::{
@@ -10,6 +11,43 @@ use localgpt::agent::{
 };
 use localgpt::config::Config;
 use localgpt::memory::MemoryManager;
+
+/// Extract relevant detail from tool arguments for display
+fn extract_tool_detail(tool_name: &str, arguments: &str) -> Option<String> {
+    let args: Value = serde_json::from_str(arguments).ok()?;
+
+    match tool_name {
+        "edit_file" | "write_file" | "read_file" => {
+            args.get("path")
+                .or_else(|| args.get("file_path"))
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        }
+        "bash" => {
+            args.get("command")
+                .and_then(|v| v.as_str())
+                .map(|s| {
+                    // Truncate long commands
+                    if s.len() > 60 {
+                        format!("{}...", &s[..57])
+                    } else {
+                        s.to_string()
+                    }
+                })
+        }
+        "memory_search" => {
+            args.get("query")
+                .and_then(|v| v.as_str())
+                .map(|s| format!("\"{}\"", s))
+        }
+        "web_fetch" => {
+            args.get("url")
+                .and_then(|v| v.as_str())
+                .map(|s| s.to_string())
+        }
+        _ => None,
+    }
+}
 
 #[derive(Args)]
 pub struct ChatArgs {
@@ -150,9 +188,15 @@ pub async fn run(args: ChatArgs, agent_id: &str) -> Result<()> {
 
                 // Handle tool calls if any
                 if let Some(tool_calls) = pending_tool_calls {
-                    // Show tool execution indicator with tool names
-                    let tool_names: Vec<&str> = tool_calls.iter().map(|tc| tc.name.as_str()).collect();
-                    println!("\n[Executing: {}]", tool_names.join(", "));
+                    // Show tool execution with details
+                    for tc in &tool_calls {
+                        let detail = extract_tool_detail(&tc.name, &tc.arguments);
+                        if let Some(d) = detail {
+                            println!("\n[{}: {}]", tc.name, d);
+                        } else {
+                            println!("\n[{}]", tc.name);
+                        }
+                    }
                     stdout.flush()?;
 
                     match agent.execute_streaming_tool_calls(&full_response, tool_calls).await {
