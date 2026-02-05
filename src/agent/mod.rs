@@ -12,7 +12,7 @@ pub use providers::{
 pub use session::{
     get_last_session_id, get_last_session_id_for_agent, get_sessions_dir_for_agent, get_state_dir,
     list_sessions, list_sessions_for_agent, search_sessions, search_sessions_for_agent, Session,
-    SessionInfo, SessionSearchResult, SessionStatus, DEFAULT_AGENT_ID,
+    SessionInfo, SessionMessage, SessionSearchResult, SessionStatus, DEFAULT_AGENT_ID,
 };
 pub use session_store::{SessionEntry, SessionStore};
 pub use skills::{get_skills_summary, load_skills, parse_skill_command, Skill, SkillInvocation};
@@ -755,6 +755,11 @@ impl Agent {
     /// Get messages for the LLM (for streaming)
     pub fn session_messages(&self) -> Vec<Message> {
         self.session.messages_for_llm()
+    }
+
+    /// Get raw session messages with metadata (for API responses)
+    pub fn raw_session_messages(&self) -> &[SessionMessage] {
+        self.session.raw_messages()
     }
 
     /// Add a user message to the session

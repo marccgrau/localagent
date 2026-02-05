@@ -217,6 +217,11 @@ impl Session {
         self.messages.iter().map(|sm| &sm.message).collect()
     }
 
+    /// Get raw session messages with metadata (for API responses)
+    pub fn raw_messages(&self) -> &[SessionMessage] {
+        &self.messages
+    }
+
     pub fn user_assistant_messages(&self) -> Vec<Message> {
         self.messages
             .iter()

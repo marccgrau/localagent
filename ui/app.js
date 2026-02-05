@@ -31,11 +31,11 @@ function setupEventListeners() {
         input.style.height = Math.min(input.scrollHeight, 200) + 'px';
     };
 
-    document.getElementById('session-select').onchange = (e) => {
+    document.getElementById('session-select').onchange = async (e) => {
         if (e.target.value) {
             sessionId = e.target.value;
             clearMessages();
-            showEmptyState();
+            await loadSessionMessages(sessionId);
         }
     };
 
@@ -122,6 +122,59 @@ async function newSession() {
 
 function clearMessages() {
     document.getElementById('messages').innerHTML = '';
+}
+
+async function loadSessionMessages(sessionId) {
+    try {
+        const res = await fetch(`${API}/sessions/${sessionId}/messages`);
+        if (!res.ok) {
+            if (res.status === 404) {
+                // Session not found, show empty state
+                showEmptyState();
+                return;
+            }
+            throw new Error(`HTTP ${res.status}`);
+        }
+
+        const data = await res.json();
+
+        if (!data.messages || data.messages.length === 0) {
+            showEmptyState();
+            return;
+        }
+
+        // Render each message
+        for (const msg of data.messages) {
+            if (msg.role === 'system') continue; // Skip system messages
+
+            if (msg.role === 'user') {
+                appendMessage('user', msg.content || '');
+            } else if (msg.role === 'assistant') {
+                const div = appendMessage('assistant', msg.content || '');
+
+                // Render tool calls if present
+                if (msg.tool_calls && msg.tool_calls.length > 0) {
+                    for (const tc of msg.tool_calls) {
+                        const toolDiv = document.createElement('div');
+                        toolDiv.className = 'message tool';
+                        toolDiv.innerHTML = `<span class="tool-name">[${tc.name}]</span>`;
+                        div.after(toolDiv);
+                    }
+                }
+            } else if (msg.role === 'toolResult') {
+                const toolDiv = document.createElement('div');
+                toolDiv.className = 'message tool';
+                const output = msg.content ? msg.content.slice(0, 300) : 'Done';
+                toolDiv.innerHTML = `<span class="tool-name">[result]</span><div class="tool-output">${escapeHtml(output)}</div>`;
+                document.getElementById('messages').appendChild(toolDiv);
+            }
+        }
+
+        scrollToBottom();
+    } catch (err) {
+        console.error('Failed to load session messages:', err);
+        showEmptyState();
+    }
 }
 
 async function sendMessage() {

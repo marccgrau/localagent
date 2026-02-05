@@ -118,6 +118,10 @@ impl Server {
             .route("/api/sessions", get(list_sessions))
             .route("/api/sessions/{session_id}", delete(delete_session))
             .route("/api/sessions/{session_id}", get(get_session_status))
+            .route(
+                "/api/sessions/{session_id}/messages",
+                get(get_session_messages),
+            )
             .route("/api/sessions/{session_id}/compact", post(compact_session))
             .route("/api/sessions/{session_id}/clear", post(clear_session))
             .route("/api/sessions/{session_id}/model", post(set_session_model))
@@ -459,6 +463,81 @@ async fn get_session_status(
                 idle_seconds: entry.last_accessed.elapsed().as_secs(),
                 api_input_tokens: status.api_input_tokens,
                 api_output_tokens: status.api_output_tokens,
+            })
+            .into_response()
+        }
+        None => AppError(StatusCode::NOT_FOUND, "Session not found".to_string()).into_response(),
+    }
+}
+
+// Get session messages - returns message history for an active session
+#[derive(Serialize)]
+struct ActiveSessionMessage {
+    role: String,
+    content: Option<String>,
+    tool_calls: Option<Vec<serde_json::Value>>,
+    tool_call_id: Option<String>,
+    timestamp: u64,
+}
+
+#[derive(Serialize)]
+struct SessionMessagesResponse {
+    session_id: String,
+    messages: Vec<ActiveSessionMessage>,
+}
+
+async fn get_session_messages(
+    State(state): State<Arc<AppState>>,
+    Path(session_id): Path<String>,
+) -> Response {
+    let mut sessions = state.sessions.lock().await;
+
+    match sessions.get_mut(&session_id) {
+        Some(entry) => {
+            entry.last_accessed = Instant::now();
+
+            let messages: Vec<ActiveSessionMessage> = entry
+                .agent
+                .raw_session_messages()
+                .iter()
+                .map(|sm| {
+                    let role = match sm.message.role {
+                        crate::agent::Role::User => "user",
+                        crate::agent::Role::Assistant => "assistant",
+                        crate::agent::Role::System => "system",
+                        crate::agent::Role::Tool => "toolResult",
+                    };
+
+                    // Convert tool calls to JSON
+                    let tool_calls = sm.message.tool_calls.as_ref().map(|tcs| {
+                        tcs.iter()
+                            .map(|tc| {
+                                json!({
+                                    "id": tc.id,
+                                    "name": tc.name,
+                                    "arguments": tc.arguments
+                                })
+                            })
+                            .collect()
+                    });
+
+                    ActiveSessionMessage {
+                        role: role.to_string(),
+                        content: if sm.message.content.is_empty() {
+                            None
+                        } else {
+                            Some(sm.message.content.clone())
+                        },
+                        tool_calls,
+                        tool_call_id: sm.message.tool_call_id.clone(),
+                        timestamp: sm.timestamp,
+                    }
+                })
+                .collect();
+
+            Json(SessionMessagesResponse {
+                session_id,
+                messages,
             })
             .into_response()
         }
@@ -941,7 +1020,7 @@ struct SavedSessionsResponse {
 async fn list_saved_sessions(State(_state): State<Arc<AppState>>) -> Response {
     use crate::agent::list_sessions_for_agent;
 
-    match list_sessions_for_agent("main") {
+    match list_sessions_for_agent(HTTP_AGENT_ID) {
         Ok(sessions) => {
             let session_list: Vec<SavedSessionInfo> = sessions
                 .into_iter()
@@ -983,7 +1062,7 @@ async fn get_saved_session(Path(session_id): Path<String>) -> Response {
     use std::fs::File;
     use std::io::{BufRead, BufReader};
 
-    let sessions_dir = match get_sessions_dir_for_agent("main") {
+    let sessions_dir = match get_sessions_dir_for_agent(HTTP_AGENT_ID) {
         Ok(dir) => dir,
         Err(e) => {
             return AppError(StatusCode::INTERNAL_SERVER_ERROR, e.to_string()).into_response()
@@ -1020,10 +1099,7 @@ async fn get_saved_session(Path(session_id): Path<String>) -> Response {
 
         // First line is session header
         if i == 0 && parsed["type"].as_str() == Some("session") {
-            created_at = parsed["timestamp"]
-                .as_str()
-                .unwrap_or("")
-                .to_string();
+            created_at = parsed["timestamp"].as_str().unwrap_or("").to_string();
             continue;
         }
 
@@ -1052,20 +1128,20 @@ async fn get_saved_session(Path(session_id): Path<String>) -> Response {
                 };
 
                 // Extract tool calls
-                let tool_calls = msg["toolCalls"]
-                    .as_array()
-                    .map(|arr| arr.clone());
+                let tool_calls = msg["toolCalls"].as_array().map(|arr| arr.clone());
 
                 // Extract tool result ID
-                let tool_call_id = msg["toolCallId"]
-                    .as_str()
-                    .map(String::from);
+                let tool_call_id = msg["toolCallId"].as_str().map(String::from);
 
                 let timestamp = msg["timestamp"].as_u64();
 
                 messages.push(SavedSessionMessage {
                     role,
-                    content: if content.is_empty() { None } else { Some(content) },
+                    content: if content.is_empty() {
+                        None
+                    } else {
+                        Some(content)
+                    },
                     tool_calls,
                     tool_call_id,
                     timestamp,
