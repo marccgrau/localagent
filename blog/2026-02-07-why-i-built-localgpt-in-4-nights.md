@@ -2,7 +2,7 @@
 slug: why-i-built-localgpt-in-4-nights
 title: Why I Built LocalGPT in 4 Nights
 authors: [localgpt]
-tags: [rust, ai, open-source, development]
+tags: [rust, ai, open-source, development, openclaw, localgpt]
 ---
 
 # Why I Built LocalGPT in 4 Nights
@@ -27,11 +27,11 @@ But OpenClaw is a full platform — ~460k lines of TypeScript across ~2,500 file
 
 ### 4 Nights in Rust
 
-I wondered: what does this architecture look like as a single Rust binary? So I paired up with Claude and here's what happened over 4 nights.
+I wondered: what does this architecture look like as a single Rust binary? So I paired up with Claude and here's what happened.
 
 **Night 1 (Feb 1, 2 commits)**: The foundation. Core agent system with the full module architecture (agent, CLI, daemon, memory, server, heartbeat), streaming responses, and the initial project structure. By midnight: a working skeleton. ~3,000 lines.
 
-**Night 2 (Feb 2-3, 34 commits — the marathon)**: This is where it came alive. Claude CLI as the primary LLM provider, OpenClaw-compatible file structure, SOUL.md persona support, system prompt with identity and safety, skills system, readline CLI with arrow keys and history, SQLite memory index with FTS5, embeddings and vector search, streaming tool execution, WebSocket API, session persistence, Anthropic streaming, model selection, and memory management — and by 2am, a working end-to-end system. The most productive night by far.
+**Night 2 (Feb 2-3, 34 commits — the marathon)**: This is where it came alive. Claude CLI as the primary LLM provider, OpenClaw-compatible file structure, SOUL persona support, system prompt with identity and safety, skills system, readline CLI with arrow keys and history, SQLite memory index with FTS5, embeddings and vector search, streaming tool execution, WebSocket API, session persistence, Anthropic streaming, model selection, and memory management — and by 2am, a working end-to-end system. The most productive night by far.
 
 **Night 3 (Feb 3, 27 commits)**: Woke up and kept going. Local embeddings with fastembed for semantic search, multi-session HTTP API with 6+ endpoints, token tracking, file and image attachments, tool approval mode, an embedded web UI served from the binary, daemon mode running heartbeat and server concurrently, configurable memory indexing, session management, and config API endpoints.
 

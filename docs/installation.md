@@ -16,8 +16,8 @@ sidebar_position: 2
 
 ```bash
 # Clone the repository
-git clone https://github.com/localgpt-app/localgpt-app.git
-cd localgpt-app/localgpt
+git clone https://github.com/localgpt-app/localgpt.git
+cd localgpt
 
 # Build release binary
 cargo build --release
