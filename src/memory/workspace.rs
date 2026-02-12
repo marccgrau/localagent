@@ -130,11 +130,11 @@ _This file is yours to evolve. As you learn who you are, update it._
 
 const LOCALGPT_POLICY_TEMPLATE: &str = r#"# LocalGPT.md
 
-Your standing instructions to the AI — always present, always last.
+Your standing instructions to the AI — always present, near the end.
 
-Whatever you write here is injected at the end of every conversation turn,
-right before the AI responds. Use it for conventions, boundaries, preferences,
-and reminders you want the AI to always follow.
+Whatever you write here is injected near the end of every conversation turn,
+just before a hardcoded security suffix. Use it for conventions, boundaries,
+preferences, and reminders you want the AI to always follow.
 
 Edit this file, then run `localgpt md sign` to activate changes.
 
