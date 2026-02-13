@@ -1,92 +1,99 @@
 # Changelog
 
+All notable changes to LocalGPT are documented in this file.
+
 ## [Unreleased]
+
+No unreleased changes.
+
+## [0.1.3] - 2026-02-12
+
+A major release focused on security hardening, new provider support, and the Telegram bot interface.
 
 ### Added
 
-#### Telegram bot interface
+- **Telegram bot interface** with one-time pairing auth, slash commands, streaming responses with debounced edits, and full tool support. Runs as a background task inside the daemon. ([#15](https://github.com/localgpt-app/localgpt/pull/15))
+- **Telegram HTML rendering** for agent responses with markdown-to-HTML conversion. ([#16](https://github.com/localgpt-app/localgpt/pull/16))
+- **GLM (Z.AI) provider** support, adding Z.AI's GLM models as a new LLM backend. ([#21](https://github.com/localgpt-app/localgpt/pull/21))
+- **Security policy module** with HMAC signing and tamper-detecting audit chain.
+- **Kernel-enforced shell sandbox** for LLM-issued commands using macOS Seatbelt and Linux Landlock/seccomp.
+- **Prompt injection defenses** with per-turn injection, suspicious-content warnings surfaced to users, and configurable strict policy mode.
+- **Windows build support** by gating Unix-only sandbox and nix APIs behind `cfg(unix)`.
 
-Access LocalGPT from Telegram with full chat, tool use, and memory support.
-Configure with `[telegram]` in `config.toml`, pair via a one-time 6-digit code,
-and use slash commands (`/help`, `/new`, `/model`, `/memory`, etc.) just like
-the CLI. Runs as a background task inside the daemon.
+### Changed
+
+- Renamed `localgpt security` CLI subcommand to `localgpt md`.
+- Updated `LocalGPT.md` init template to match standing-instructions framing.
+- Upgraded all dependencies to latest versions.
 
 ### Fixed
 
-#### OpenAI-compatible provider: tool calls silently dropped during streaming
+- Security block incorrectly sent as a prompt to Claude CLI instead of as a user message.
+- Clippy warnings for Rust 1.93.
+- Landlock/seccompiler API usage updated for latest crate versions.
 
-**Problem**
+### Contributors
 
-When using the OpenAI provider with a local llama-server backend (or any
-OpenAI-compatible endpoint), tool calls are never executed. The model
-reports its available tools correctly, but when asked to use one it emits
-raw XML-like text instead of producing structured tool calls:
+Thanks to **[@haraldh](https://github.com/haraldh)** for building the Telegram bot interface and HTML rendering, and **[@austingreisman](https://github.com/austingreisman)** for adding GLM (Z.AI) provider support!
 
-```
-LocalGPT: <tool_call>
-<bash>
-pwd
-</tool_call>
-</tool_call>
-```
+## [0.1.2] - 2026-02-09
 
-The tools are never executed. The session transcript confirms the
-response arrives as plain text content, not as a `tool_calls` array:
+This release enables tool calling for Ollama and OpenAI-compatible providers, and improves memory search quality.
 
-```json
-{
-  "content": [
-    {
-      "text": "<tool_call>\n<bash>\npwd\n</tool_call>\n</tool_call>",
-      "type": "text"
-    }
-  ],
-  "role": "assistant"
-}
-```
+### Added
 
-However, hitting llama-server directly via curl with the same tool
-schemas returns a correctly structured response with
-`"finish_reason": "tool_calls"` and a valid `tool_calls` array.
+- **Ollama tool calling support**, allowing Ollama models to execute agent tools. ([#14](https://github.com/localgpt-app/localgpt/pull/14))
+- **Desktop feature flag** for headless builds (compile without GUI dependencies).
+- GitHub Actions CI workflow with license audit via `cargo-deny`.
 
-**Diagnosis**
+### Fixed
 
-The `OpenAIProvider` implements `chat()` and `summarize()` but does not
-implement `chat_stream()`. The interactive chat CLI uses the streaming
-path (`agent.chat_stream_with_images()`), which falls through to the
-default `chat_stream` implementation on the `LLMProvider` trait.
+- **OpenAI provider tools** were silently dropped during streaming — the default `chat_stream` fallback now forwards tools and handles `ToolCalls` responses correctly. ([#11](https://github.com/localgpt-app/localgpt/pull/11))
+- **Memory search** improved with token AND matching and rank-based scoring for more relevant results. ([#10](https://github.com/localgpt-app/localgpt/pull/10))
+- Linux desktop builds now include x11 and Wayland features.
 
-Two bugs in the default fallback (`src/agent/providers.rs`, lines
-152-173):
+### Contributors
 
-1. **Tools are dropped.** The fallback calls `self.chat(messages, None)`
-   — passing `None` for the tools parameter instead of forwarding the
-   tools it received. The model never sees tool schemas in the API
-   request, so it cannot produce structured `tool_calls` responses. It
-   falls back to emitting its training-time tool format as raw text.
+Thanks to **[@JarvisDeLaAri](https://github.com/JarvisDeLaAri)** for enabling Ollama tool calling, and **[@Ax73](https://github.com/Ax73)** for fixing OpenAI provider tool support!
 
-2. **ToolCalls response is treated as an error.** If `chat()` were to
-   return `LLMResponseContent::ToolCalls`, the fallback returns
-   `Err("Tool calls not supported in streaming")` instead of converting
-   the tool calls into a `StreamChunk` with the `tool_calls` field
-   populated.
+## [0.1.1] - 2026-02-07
 
-The combination means: the model never receives tool schemas (bug 1),
-and even if it did, the response would be discarded (bug 2).
+Introduces the desktop GUI, GGUF embedding support, and workspace concurrency safety.
 
-**Impact**
+### Added
 
-Any provider that relies on the default `chat_stream` fallback — which
-currently includes `OpenAIProvider` — cannot execute tools when used via
-the interactive chat CLI. This affects all OpenAI-compatible local
-backends (llama-server, vLLM, LM Studio, etc.) and the OpenAI API
-itself.
+- **Desktop GUI** built with egui, providing a native app experience.
+- **GGUF embedding support** via llama.cpp for fully local semantic search.
+- **Streaming tool details and slash commands** in the egui and web UIs.
+- **Concurrency protections** for workspace file access.
 
-The Anthropic and Ollama providers are unaffected because they implement
-their own `chat_stream`. (Ollama separately drops tools intentionally.)
+### Fixed
 
-**Fix**
+- UTF-8 boundary panics in memory search snippets resolved; indexing simplified.
 
-1. Forward the `tools` parameter in the default `chat_stream` fallback.
-2. Convert `ToolCalls` responses into a `StreamChunk` with `tool_calls`
-   populated instead of returning an error.
+## [0.1.0] - 2026-02-04
+
+Initial release of LocalGPT — a local-only AI assistant with persistent markdown-based memory.
+
+### Added
+
+- **Interactive CLI chat** with streaming responses and tool execution.
+- **Multi-provider LLM support**: Anthropic, OpenAI, Ollama, and Claude CLI.
+- **Markdown-based memory system** with `MEMORY.md`, daily logs, and `HEARTBEAT.md`.
+- **Semantic search** using SQLite FTS5 and local embeddings via fastembed.
+- **Autonomous heartbeat** runner for background task execution on configurable intervals.
+- **HTTP/WebSocket API** with REST endpoints and real-time chat.
+- **Embedded Web UI** for browser-based interaction.
+- **OpenClaw compatibility** for workspace files, session format, and skills system.
+- **Agent tools**: bash, read_file, write_file, edit_file, memory_search, memory_get, web_fetch.
+- **Session management** with persistence, compaction, search, and export.
+- **Image attachment support** for multimodal LLMs.
+- **Tool approval mode** for dangerous operations.
+- **Zero-config startup** defaulting to `claude-cli/opus`.
+- **Auto-migration** from OpenClaw config if present.
+
+[Unreleased]: https://github.com/localgpt-app/localgpt/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/localgpt-app/localgpt/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/localgpt-app/localgpt/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/localgpt-app/localgpt/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/localgpt-app/localgpt/releases/tag/v0.1.0
