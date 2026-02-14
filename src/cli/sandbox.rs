@@ -1,8 +1,8 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use localgpt::config::Config;
-use localgpt::sandbox::{SandboxLevel, build_policy, detect_capabilities, run_sandboxed};
+use crate::config::Config;
+use crate::sandbox::{SandboxLevel, build_policy, detect_capabilities, run_sandboxed};
 
 #[derive(Args)]
 pub struct SandboxArgs {

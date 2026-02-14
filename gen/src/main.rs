@@ -15,8 +15,7 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
-    // Handle Gen mode specially — Bevy must own the main thread (no tokio runtime here)
-    #[cfg(feature = "gen")]
+    // Handle Gen mode — Bevy must own the main thread (no tokio runtime here)
     if let Commands::Gen(args) = cli.command {
         // Initialize logging before handing off to Bevy
         let log_level = if cli.verbose { "debug" } else { "info" };
@@ -34,11 +33,9 @@ fn main() -> Result<()> {
     if let Commands::Daemon(ref args) = cli.command {
         match args.command {
             localgpt::cli::daemon::DaemonCommands::Start { foreground: false } => {
-                // Do the fork synchronously, then start Tokio in the child
                 return localgpt::cli::daemon::daemonize_and_run(&cli.agent);
             }
             localgpt::cli::daemon::DaemonCommands::Restart { foreground: false } => {
-                // Stop first (synchronously), then fork and start
                 localgpt::cli::daemon::stop_sync()?;
                 return localgpt::cli::daemon::daemonize_and_run(&cli.agent);
             }
@@ -66,9 +63,7 @@ async fn async_main(cli: Cli) -> Result<()> {
     match cli.command {
         Commands::Chat(args) => localgpt::cli::chat::run(args, &cli.agent).await,
         Commands::Ask(args) => localgpt::cli::ask::run(args, &cli.agent).await,
-        #[cfg(feature = "desktop")]
         Commands::Desktop(args) => localgpt::cli::desktop::run(args, &cli.agent),
-        #[cfg(feature = "gen")]
         Commands::Gen(_) => unreachable!("Gen is handled before tokio runtime starts"),
         Commands::Daemon(args) => localgpt::cli::daemon::run(args, &cli.agent).await,
         Commands::Memory(args) => localgpt::cli::memory::run(args, &cli.agent).await,

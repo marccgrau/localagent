@@ -6,11 +6,11 @@ use std::path::PathBuf;
 #[cfg(unix)]
 use daemonize::Daemonize;
 
-use localgpt::concurrency::TurnGate;
-use localgpt::config::Config;
-use localgpt::heartbeat::HeartbeatRunner;
-use localgpt::memory::MemoryManager;
-use localgpt::server::Server;
+use crate::concurrency::TurnGate;
+use crate::config::Config;
+use crate::heartbeat::HeartbeatRunner;
+use crate::memory::MemoryManager;
+use crate::server::Server;
 
 /// Synchronously stop the daemon (for use before Tokio runtime starts)
 pub fn stop_sync() -> Result<()> {
@@ -185,8 +185,7 @@ async fn run_daemon_services(config: &Config, agent_id: &str) -> Result<()> {
         let tg_gate = turn_gate.clone();
         println!("  Telegram: enabled");
         Some(tokio::spawn(async move {
-            if let Err(e) = localgpt::server::telegram::run_telegram_bot(&tg_config, tg_gate).await
-            {
+            if let Err(e) = crate::server::telegram::run_telegram_bot(&tg_config, tg_gate).await {
                 tracing::error!("Telegram bot error: {}", e);
             }
         }))
@@ -453,12 +452,12 @@ async fn run_heartbeat_once(agent_id: &str) -> Result<()> {
 
 fn get_pid_file() -> Result<PathBuf> {
     // Put PID file in state dir (~/.localgpt/), not workspace
-    let state_dir = localgpt::agent::get_state_dir()?;
+    let state_dir = crate::agent::get_state_dir()?;
     Ok(state_dir.join("daemon.pid"))
 }
 
 fn get_log_file(retention_days: u32) -> Result<PathBuf> {
-    let state_dir = localgpt::agent::get_state_dir()?;
+    let state_dir = crate::agent::get_state_dir()?;
     let logs_dir = state_dir.join("logs");
     fs::create_dir_all(&logs_dir)?;
 

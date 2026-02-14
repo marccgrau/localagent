@@ -3,7 +3,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use localgpt::gen3d;
+use crate::gen3d;
 
 #[derive(Args)]
 pub struct GenArgs {
@@ -46,14 +46,18 @@ fn run_bevy_app(channels: gen3d::GenChannels) -> Result<()> {
 
     let mut app = App::new();
 
-    app.add_plugins(DefaultPlugins.set(WindowPlugin {
-        primary_window: Some(Window {
-            title: "LocalGPT Gen".into(),
-            resolution: bevy::window::WindowResolution::new(1280.0, 720.0),
-            ..default()
-        }),
-        ..default()
-    }));
+    app.add_plugins(
+        DefaultPlugins
+            .set(WindowPlugin {
+                primary_window: Some(Window {
+                    title: "LocalGPT Gen".into(),
+                    resolution: bevy::window::WindowResolution::new(1280.0, 720.0),
+                    ..default()
+                }),
+                ..default()
+            })
+            .disable::<bevy::log::LogPlugin>(),
+    );
 
     gen3d::plugin::setup_gen_app(&mut app, channels);
 
@@ -68,9 +72,9 @@ async fn run_agent_loop(
     agent_id: &str,
     initial_prompt: Option<String>,
 ) -> Result<()> {
-    use localgpt::agent::Agent;
-    use localgpt::config::Config;
-    use localgpt::memory::MemoryManager;
+    use crate::agent::Agent;
+    use crate::config::Config;
+    use crate::memory::MemoryManager;
     use std::io::{self, Write};
     use std::sync::Arc;
 
@@ -82,7 +86,7 @@ async fn run_agent_loop(
     let memory = Arc::new(memory);
 
     // Create default tools + gen tools
-    let mut tools = localgpt::agent::tools::create_default_tools(&config, Some(memory.clone()))?;
+    let mut tools = crate::agent::tools::create_default_tools(&config, Some(memory.clone()))?;
     tools.extend(gen3d::tools::create_gen_tools(bridge));
 
     // Create agent with combined tools

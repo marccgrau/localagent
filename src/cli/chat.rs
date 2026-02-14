@@ -5,14 +5,14 @@ use rustyline::DefaultEditor;
 use rustyline::error::ReadlineError;
 use std::io::{self, Write};
 
-use localgpt::agent::{
+use crate::agent::{
     Agent, AgentConfig, ImageAttachment, Skill, extract_tool_detail, get_last_session_id_for_agent,
     get_skills_summary, list_sessions_for_agent, load_skills, parse_skill_command,
     search_sessions_for_agent,
 };
-use localgpt::concurrency::WorkspaceLock;
-use localgpt::config::Config;
-use localgpt::memory::MemoryManager;
+use crate::concurrency::WorkspaceLock;
+use crate::config::Config;
+use crate::memory::MemoryManager;
 
 /// Adjust a byte index to the nearest valid UTF-8 char boundary (searching forward).
 fn floor_char_boundary(s: &str, index: usize) -> usize {
@@ -525,7 +525,7 @@ async fn handle_command(
         "/help" | "/h" | "/?" => {
             println!(
                 "\n{}",
-                localgpt::commands::format_help_text(localgpt::commands::Interface::Cli)
+                crate::commands::format_help_text(crate::commands::Interface::Cli)
             );
 
             // Show skill commands if any

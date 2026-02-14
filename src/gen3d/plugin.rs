@@ -133,7 +133,6 @@ fn process_gen_commands(
     parent_query: Query<&Parent>,
     visibility_query: Query<&Visibility>,
     material_handles: Query<&MeshMaterial3d<StandardMaterial>>,
-    material_assets: Res<Assets<StandardMaterial>>,
 ) {
     while let Ok(cmd) = channel_res.channels.cmd_rx.try_recv() {
         let response = match cmd {
@@ -142,7 +141,7 @@ fn process_gen_commands(
                 &transforms,
                 &gen_entities,
                 &material_handles,
-                &material_assets,
+                &materials,
             ),
             GenCommand::EntityInfo { name } => handle_entity_info(
                 &name,
@@ -154,7 +153,7 @@ fn process_gen_commands(
                 &parent_query,
                 &visibility_query,
                 &material_handles,
-                &material_assets,
+                &materials,
             ),
             GenCommand::Screenshot {
                 width,
@@ -183,7 +182,6 @@ fn process_gen_commands(
                 &registry,
                 &mut materials,
                 &material_handles,
-                &material_assets,
                 &transforms,
             ),
             GenCommand::DeleteEntity { name } => {
@@ -272,7 +270,7 @@ fn handle_scene_info(
     transforms: &Query<&Transform>,
     gen_entities: &Query<&GenEntity>,
     material_handles: &Query<&MeshMaterial3d<StandardMaterial>>,
-    material_assets: &Res<Assets<StandardMaterial>>,
+    material_assets: &Assets<StandardMaterial>,
 ) -> GenResponse {
     let mut entities = Vec::new();
 
@@ -325,7 +323,7 @@ fn handle_entity_info(
     parent_query: &Query<&Parent>,
     visibility_query: &Query<&Visibility>,
     material_handles: &Query<&MeshMaterial3d<StandardMaterial>>,
-    material_assets: &Res<Assets<StandardMaterial>>,
+    material_assets: &Assets<StandardMaterial>,
 ) -> GenResponse {
     let Some(entity) = registry.get_entity(name) else {
         return GenResponse::Error {
@@ -510,7 +508,6 @@ fn handle_modify_entity(
     registry: &NameRegistry,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     material_handles: &Query<&MeshMaterial3d<StandardMaterial>>,
-    material_assets: &Res<Assets<StandardMaterial>>,
     transforms: &Query<&Transform>,
 ) -> GenResponse {
     let Some(entity) = registry.get_entity(&cmd.name) else {
@@ -555,7 +552,7 @@ fn handle_modify_entity(
         let current_mat = material_handles
             .get(entity)
             .ok()
-            .and_then(|h| material_assets.get(&h.0))
+            .and_then(|h| materials.get(&h.0))
             .cloned();
 
         let base = current_mat.unwrap_or_default();

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use localgpt::config::Config;
+use crate::config::Config;
 
 #[derive(Args)]
 pub struct ConfigArgs {

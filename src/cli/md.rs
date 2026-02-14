@@ -6,8 +6,8 @@
 use anyhow::Result;
 use clap::{Args, Subcommand};
 
-use localgpt::config::Config;
-use localgpt::security;
+use crate::config::Config;
+use crate::security;
 
 #[derive(Args)]
 pub struct MdArgs {

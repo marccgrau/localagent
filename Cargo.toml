@@ -1,6 +1,11 @@
+[workspace]
+members = ["gen"]
+default-members = ["."]
+resolver = "3"
+
 [package]
 name = "localgpt"
-version = "0.1.3"
+version = "0.2.0"
 edition = "2024"
 description = "A local device focused AI assistant with persistent markdown memory, autonomous heartbeat tasks, and semantic search. Single binary, no runtime dependencies."
 license = "Apache-2.0"
