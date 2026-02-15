@@ -16,6 +16,10 @@ readme = "README.md"
 keywords = ["ai", "assistant", "llm", "memory", "local"]
 categories = ["command-line-utilities", "text-processing"]
 
+[workspace.metadata.release]
+shared-version = true
+tag-name = "v{{version}}"
+
 [features]
 default = ["desktop"]
 # Desktop GUI (eframe/egui). Disable for headless/server/Docker builds.
