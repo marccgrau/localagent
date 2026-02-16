@@ -1230,13 +1230,11 @@ pub struct AgentHandle {
     inner: Arc<tokio::sync::Mutex<Agent>>,
 }
 
-// Compile-time guarantee that AgentHandle is safe to share across threads.
-const _: () = {
-    fn assert_send_sync<T: Send + Sync>() {}
-    fn check() {
-        assert_send_sync::<AgentHandle>();
-    }
-};
+// Compile-time assertion: AgentHandle must be Send + Sync.
+fn _assert_agent_handle_is_send_sync() {
+    fn require_send_sync<T: Send + Sync>() {}
+    require_send_sync::<AgentHandle>();
+}
 
 impl AgentHandle {
     /// Create a new handle wrapping an existing Agent.

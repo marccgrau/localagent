@@ -5,6 +5,7 @@ ios/build/
 ios/DerivedData/
 
 # Android build artifacts
+android/Generated/
 android/.gradle/
 android/build/
 android/app/build/

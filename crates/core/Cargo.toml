@@ -7,9 +7,11 @@ repository.workspace = true
 description = "Core library for LocalGPT — agent, memory, config, security"
 
 [features]
-default = ["embeddings-local"]
+default = ["embeddings-local", "claude-cli"]
 # Local embeddings via fastembed (ONNX). Desktop default.
 embeddings-local = ["fastembed"]
+# Claude CLI provider (requires subprocess execution — not available on mobile)
+claude-cli = []
 # GGUF embedding model support via llama.cpp (requires C++ compiler)
 embeddings-gguf = ["llama-cpp-2"]
 # OpenAI API embeddings (no native deps, always works on mobile)

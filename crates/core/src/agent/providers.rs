@@ -6,10 +6,16 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use std::pin::Pin;
+#[cfg(feature = "claude-cli")]
 use std::process::Stdio;
+#[cfg(feature = "claude-cli")]
 use std::sync::Mutex as StdMutex;
+#[cfg(feature = "claude-cli")]
 use tokio::io::{AsyncBufReadExt, BufReader};
+#[cfg(feature = "claude-cli")]
 use tracing::{debug, info};
+#[cfg(not(feature = "claude-cli"))]
+use tracing::debug;
 
 use crate::config::Config;
 
@@ -216,6 +222,7 @@ fn normalize_model_id(provider: &str, model_id: &str) -> String {
 }
 
 pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvider>> {
+    #[cfg(feature = "claude-cli")]
     let workspace = config.workspace_path();
 
     // Resolve aliases first (e.g., "opus" → "anthropic/claude-opus-4-5")
@@ -279,12 +286,20 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             )?))
         }
 
+        #[cfg(feature = "claude-cli")]
         "claude-cli" => {
             let cli_config = config.providers.claude_cli.as_ref();
             let command = cli_config.map(|c| c.command.as_str()).unwrap_or("claude");
             Ok(Box::new(ClaudeCliProvider::new(
                 command, &model_id, workspace,
             )?))
+        }
+        #[cfg(not(feature = "claude-cli"))]
+        "claude-cli" => {
+            anyhow::bail!(
+                "Claude CLI provider is not available in this build.\n\
+                 The 'claude-cli' feature is required for subprocess-based providers."
+            )
         }
 
         "ollama" => {
@@ -322,6 +337,7 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
 
         _ => {
             // Fallback: try Claude CLI if configured
+            #[cfg(feature = "claude-cli")]
             if let Some(cli_config) = &config.providers.claude_cli {
                 return Ok(Box::new(ClaudeCliProvider::new(
                     &cli_config.command,
@@ -1258,6 +1274,7 @@ impl LLMProvider for OllamaProvider {
     }
 }
 
+#[cfg(feature = "claude-cli")]
 /// Claude CLI Provider - invokes the `claude` CLI command
 /// No tool support (text in → text out only)
 /// No streaming (CLI output is collected then returned)
@@ -1274,9 +1291,11 @@ pub struct ClaudeCliProvider {
     cli_session_id: StdMutex<Option<String>>,
 }
 
+#[cfg(feature = "claude-cli")]
 /// Provider name for CLI session storage
 const CLAUDE_CLI_PROVIDER: &str = "claude-cli";
 
+#[cfg(feature = "claude-cli")]
 impl ClaudeCliProvider {
     pub fn new(command: &str, model: &str, workspace: std::path::PathBuf) -> Result<Self> {
         // Load existing CLI session from session store
@@ -1452,6 +1471,7 @@ impl ClaudeCliProvider {
     }
 }
 
+#[cfg(feature = "claude-cli")]
 /// Load CLI session ID from session store
 fn load_cli_session_from_store(session_key: &str, provider: &str) -> Option<String> {
     use super::session_store::SessionStore;
@@ -1460,6 +1480,7 @@ fn load_cli_session_from_store(session_key: &str, provider: &str) -> Option<Stri
     store.get_cli_session_id(session_key, provider)
 }
 
+#[cfg(feature = "claude-cli")]
 /// Save CLI session ID to session store
 fn save_cli_session_to_store(
     session_key: &str,
@@ -1474,6 +1495,7 @@ fn save_cli_session_to_store(
     Ok(())
 }
 
+#[cfg(feature = "claude-cli")]
 fn normalize_claude_model(model: &str) -> String {
     match model.to_lowercase().as_str() {
         "opus" | "opus-4.5" | "opus-4" | "claude-opus-4-5" => "opus",
@@ -1484,6 +1506,7 @@ fn normalize_claude_model(model: &str) -> String {
     .to_string()
 }
 
+#[cfg(feature = "claude-cli")]
 /// Check if a message is the synthetic security block appended by `messages_for_api_call`.
 fn is_security_block(msg: &Message) -> bool {
     msg.role == Role::User
@@ -1492,6 +1515,7 @@ fn is_security_block(msg: &Message) -> bool {
             .contains(crate::security::HARDCODED_SECURITY_SUFFIX)
 }
 
+#[cfg(feature = "claude-cli")]
 fn build_prompt_from_messages(messages: &[Message]) -> String {
     // Get the last *real* user message as the prompt, skipping the security block
     messages
@@ -1502,6 +1526,7 @@ fn build_prompt_from_messages(messages: &[Message]) -> String {
         .unwrap_or_default()
 }
 
+#[cfg(feature = "claude-cli")]
 fn extract_system_prompt(messages: &[Message]) -> Option<String> {
     let system = messages
         .iter()
@@ -1524,6 +1549,7 @@ fn extract_system_prompt(messages: &[Message]) -> Option<String> {
     }
 }
 
+#[cfg(feature = "claude-cli")]
 /// Parse Claude CLI JSON output, returning (response_text, session_id)
 fn parse_claude_cli_output(stdout: &str) -> Result<(String, Option<String>)> {
     // Claude CLI outputs JSON with message content and session info
@@ -1553,6 +1579,7 @@ fn parse_claude_cli_output(stdout: &str) -> Result<(String, Option<String>)> {
     Ok((stdout.trim().to_string(), None))
 }
 
+#[cfg(feature = "claude-cli")]
 #[async_trait]
 impl LLMProvider for ClaudeCliProvider {
     fn reset_session(&self) {

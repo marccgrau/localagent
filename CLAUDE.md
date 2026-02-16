@@ -72,7 +72,7 @@ localgpt-gen    ──→ localgpt-core
 Platform-independent library. Compiles for iOS/Android targets.
 
 - **agent/** - LLM interaction layer
-  - `providers.rs` - Trait `LLMProvider` with implementations for OpenAI, Anthropic, Ollama, Claude CLI, and GLM (Z.AI). Model prefix determines provider (`claude-cli/*` → Claude CLI, `gpt-*` → OpenAI, `claude-*` → Anthropic API, `glm-*` → GLM, else Ollama)
+  - `providers.rs` - Trait `LLMProvider` with implementations for OpenAI, Anthropic, Ollama, Claude CLI (feature-gated: `claude-cli`), and GLM (Z.AI). Model prefix determines provider (`claude-cli/*` → Claude CLI, `gpt-*` → OpenAI, `claude-*` → Anthropic API, `glm-*` → GLM, else Ollama)
   - `session.rs` - Conversation state with automatic compaction when approaching context window limits
   - `session_store.rs` - Session metadata store (`sessions.json`) with CLI session ID persistence
   - `system_prompt.rs` - Builds system prompt with identity, safety, workspace info, tools, skills, and special tokens
@@ -80,7 +80,8 @@ Platform-independent library. Compiles for iOS/Android targets.
   - `tools/mod.rs` - Safe tools only: `memory_search`, `memory_get`, `web_fetch`, `web_search`
   - `AgentHandle` - Thread-safe `Arc<tokio::sync::Mutex<Agent>>` wrapper for mobile/server use
 - **memory/** - Markdown-based knowledge store (SQLite FTS5, file watcher, workspace templates)
-  - Feature-gated: `embeddings-local` (fastembed/ONNX, default), `embeddings-openai`, `embeddings-gguf`, `embeddings-none`
+  - Feature-gated embeddings: `embeddings-local` (fastembed/ONNX, default), `embeddings-openai`, `embeddings-gguf`, `embeddings-none`
+  - Feature-gated provider: `claude-cli` (default) — subprocess-based Claude CLI; excluded on mobile
 - **heartbeat/** - Autonomous task runner on configurable interval
 - **config/** - TOML configuration at `~/.localgpt/config.toml`. `Config::load()` for desktop, `Config::load_from_dir()` for mobile
 - **commands.rs** - Shared slash command definitions used by CLI and Telegram
@@ -283,13 +284,30 @@ Plus any skill slash commands (e.g., `/github-pr`, `/commit`) based on installed
 
 ## Mobile Development
 
+### Generate Bindings (dev machine)
+
+```bash
+# Build the mobile crate (includes uniffi-bindgen binary)
+cargo build -p localgpt-mobile
+
+# Generate Swift bindings
+target/debug/uniffi-bindgen generate \
+  --library target/debug/liblocalgpt_mobile.dylib \
+  --language swift --out-dir mobile/ios/Generated
+
+# Generate Kotlin bindings
+target/debug/uniffi-bindgen generate \
+  --library target/debug/liblocalgpt_mobile.dylib \
+  --language kotlin --out-dir mobile/android/Generated
+```
+
 ### iOS
 
 ```bash
 # Prerequisites
 rustup target add aarch64-apple-ios aarch64-apple-ios-sim
 
-# Build and generate Swift bindings
+# Build and generate Swift bindings + XCFramework
 cd mobile/ios/scripts
 ./build-rust.sh          # Release build (default)
 ./build-rust.sh debug    # Debug build

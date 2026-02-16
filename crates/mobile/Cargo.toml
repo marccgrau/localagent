@@ -10,9 +10,13 @@ description = "LocalGPT mobile bindings via UniFFI"
 crate-type = ["staticlib", "cdylib"]
 name = "localgpt_mobile"
 
+[[bin]]
+name = "uniffi-bindgen"
+path = "uniffi-bindgen.rs"
+
 [dependencies]
 localgpt-core = { path = "../core", default-features = false, features = ["embeddings-openai"] }
-uniffi = "0.29"
+uniffi = { version = "0.29", features = ["cli"] }
 tokio = { workspace = true }
 anyhow = { workspace = true }
 thiserror = { workspace = true }
