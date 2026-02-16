@@ -4,9 +4,11 @@ mod search;
 mod watcher;
 mod workspace;
 
+#[cfg(feature = "embeddings-local")]
+pub use embeddings::FastEmbedProvider;
 #[cfg(feature = "gguf")]
 pub use embeddings::LlamaCppProvider;
-pub use embeddings::{EmbeddingProvider, FastEmbedProvider, OpenAIEmbeddingProvider, hash_text};
+pub use embeddings::{EmbeddingProvider, OpenAIEmbeddingProvider, hash_text};
 pub use index::{MemoryIndex, ReindexStats};
 pub use search::MemoryChunk;
 pub use watcher::MemoryWatcher;
@@ -102,30 +104,40 @@ impl MemoryManager {
             .as_str()
         {
             "local" => {
-                let model_name = if memory_config.embedding_model.is_empty()
-                    || memory_config.embedding_model == "text-embedding-3-small"
+                #[cfg(feature = "embeddings-local")]
                 {
-                    None // Use default local model
-                } else {
-                    Some(memory_config.embedding_model.as_str())
-                };
-                let cache_dir = if memory_config.embedding_cache_dir.is_empty() {
-                    None
-                } else {
-                    Some(memory_config.embedding_cache_dir.as_str())
-                };
-                match FastEmbedProvider::new_with_cache_dir(model_name, cache_dir) {
-                    Ok(provider) => {
-                        info!("Using local embedding provider: {}", provider.model());
-                        Some(Arc::new(provider))
-                    }
-                    Err(e) => {
-                        warn!(
-                            "Failed to initialize local embeddings: {}. Falling back to FTS-only search.",
-                            e
-                        );
+                    let model_name = if memory_config.embedding_model.is_empty()
+                        || memory_config.embedding_model == "text-embedding-3-small"
+                    {
+                        None // Use default local model
+                    } else {
+                        Some(memory_config.embedding_model.as_str())
+                    };
+                    let cache_dir = if memory_config.embedding_cache_dir.is_empty() {
                         None
+                    } else {
+                        Some(memory_config.embedding_cache_dir.as_str())
+                    };
+                    match FastEmbedProvider::new_with_cache_dir(model_name, cache_dir) {
+                        Ok(provider) => {
+                            info!("Using local embedding provider: {}", provider.model());
+                            Some(Arc::new(provider))
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Failed to initialize local embeddings: {}. Falling back to FTS-only search.",
+                                e
+                            );
+                            None
+                        }
                     }
+                }
+                #[cfg(not(feature = "embeddings-local"))]
+                {
+                    warn!(
+                        "Local embeddings requested but `embeddings-local` feature is disabled. Falling back to FTS-only search."
+                    );
+                    None
                 }
             }
             "openai" => {

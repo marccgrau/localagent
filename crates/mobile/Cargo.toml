@@ -12,4 +12,8 @@ name = "localgpt_mobile"
 
 [dependencies]
 localgpt-core = { path = "../core", default-features = false, features = ["embeddings-openai"] }
+uniffi = "0.29"
+tokio = { workspace = true }
 anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde_json = { workspace = true }

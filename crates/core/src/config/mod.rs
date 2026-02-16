@@ -635,6 +635,30 @@ impl Config {
         Ok(config)
     }
 
+    /// Load (or create default) config with all directories rooted under `data_dir`.
+    ///
+    /// Mobile apps use this instead of `load()` since they don't have XDG dirs.
+    pub fn load_from_dir(data_dir: &str) -> Result<Self> {
+        let paths = Paths::from_root(data_dir);
+        paths.ensure_dirs()?;
+        let path = paths.config_file();
+
+        if !path.exists() {
+            let config = Config {
+                paths,
+                ..Config::default()
+            };
+            config.save()?;
+            return Ok(config);
+        }
+
+        let content = fs::read_to_string(&path)?;
+        let mut config: Config = toml::from_str(&content)?;
+        config.paths = paths;
+        config.expand_env_vars();
+        Ok(config)
+    }
+
     pub fn save(&self) -> Result<()> {
         let path = self.paths.config_file();
 

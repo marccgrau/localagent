@@ -159,7 +159,10 @@ pub fn hash_text(text: &str) -> String {
 // Local Embedding Provider (fastembed) - Default provider, no API key needed
 // ============================================================================
 
+#[cfg(feature = "embeddings-local")]
 use std::sync::{Arc, Mutex as StdMutex};
+
+#[cfg(feature = "embeddings-local")]
 
 pub struct FastEmbedProvider {
     model: Arc<StdMutex<fastembed::TextEmbedding>>,
@@ -167,6 +170,7 @@ pub struct FastEmbedProvider {
     dimensions: usize,
 }
 
+#[cfg(feature = "embeddings-local")]
 impl FastEmbedProvider {
     pub fn new(model_name: Option<&str>) -> Result<Self> {
         Self::new_with_cache_dir(model_name, None)
@@ -243,6 +247,7 @@ impl FastEmbedProvider {
     }
 }
 
+#[cfg(feature = "embeddings-local")]
 #[async_trait]
 impl EmbeddingProvider for FastEmbedProvider {
     fn id(&self) -> &str {

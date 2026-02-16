@@ -1218,6 +1218,101 @@ impl Agent {
     }
 }
 
+// ---------------------------------------------------------------------------
+// AgentHandle — thread-safe wrapper for mobile and server consumers
+// ---------------------------------------------------------------------------
+
+/// Thread-safe handle to an Agent. Mobile and server code use this instead of
+/// Agent directly. Wraps in `Arc<tokio::sync::Mutex<Agent>>` so it can be
+/// shared across threads and held across `.await` points.
+#[derive(Clone)]
+pub struct AgentHandle {
+    inner: Arc<tokio::sync::Mutex<Agent>>,
+}
+
+// Compile-time guarantee that AgentHandle is safe to share across threads.
+const _: () = {
+    fn assert_send_sync<T: Send + Sync>() {}
+    fn check() {
+        assert_send_sync::<AgentHandle>();
+    }
+};
+
+impl AgentHandle {
+    /// Create a new handle wrapping an existing Agent.
+    pub fn new(agent: Agent) -> Self {
+        Self {
+            inner: Arc::new(tokio::sync::Mutex::new(agent)),
+        }
+    }
+
+    /// Send a chat message and return the full response text.
+    pub async fn chat(&self, message: &str) -> Result<String> {
+        let mut agent = self.inner.lock().await;
+        agent.chat(message).await
+    }
+
+    /// Start a new session.
+    pub async fn new_session(&self) -> Result<()> {
+        let mut agent = self.inner.lock().await;
+        agent.new_session().await
+    }
+
+    /// Search memory files.
+    pub async fn memory_search(&self, query: &str, max_results: usize) -> Result<Vec<MemoryChunk>> {
+        let agent = self.inner.lock().await;
+        agent.search_memory(query).await.map(|mut results| {
+            results.truncate(max_results);
+            results
+        })
+    }
+
+    /// Read a memory file by name.
+    pub async fn memory_get(&self, filename: &str) -> Result<String> {
+        let agent = self.inner.lock().await;
+        let workspace = agent.memory.workspace();
+        let path = workspace.join(filename);
+        std::fs::read_to_string(&path)
+            .map_err(|e| anyhow::anyhow!("Failed to read {}: {}", filename, e))
+    }
+
+    /// Get the current model name.
+    pub async fn model(&self) -> String {
+        let agent = self.inner.lock().await;
+        agent.model().to_string()
+    }
+
+    /// Switch to a different model.
+    pub async fn set_model(&self, model: &str) -> Result<()> {
+        let mut agent = self.inner.lock().await;
+        agent.set_model(model)
+    }
+
+    /// Get context window usage: (used, usable, total).
+    pub async fn context_usage(&self) -> (usize, usize, usize) {
+        let agent = self.inner.lock().await;
+        agent.context_usage()
+    }
+
+    /// Compact the session history.
+    pub async fn compact_session(&self) -> Result<(usize, usize)> {
+        let mut agent = self.inner.lock().await;
+        agent.compact_session().await
+    }
+
+    /// Clear session history.
+    pub async fn clear_session(&self) {
+        let mut agent = self.inner.lock().await;
+        agent.clear_session();
+    }
+
+    /// Export session as markdown.
+    pub async fn export_markdown(&self) -> String {
+        let agent = self.inner.lock().await;
+        agent.export_markdown()
+    }
+}
+
 /// Welcome message shown on first run (brand new workspace)
 const FIRST_RUN_WELCOME: &str = r#"# Welcome to LocalGPT
 

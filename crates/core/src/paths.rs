@@ -158,6 +158,22 @@ impl Paths {
         self.cache_dir.join("embeddings")
     }
 
+    /// Create Paths with all directories rooted under a single base path.
+    ///
+    /// Mobile apps use this to point everything at their app-specific
+    /// document or library directory.
+    pub fn from_root(root: impl Into<PathBuf>) -> Self {
+        let root = root.into();
+        Self {
+            config_dir: root.join("config"),
+            data_dir: root.join("data"),
+            workspace: root.join("data").join("workspace"),
+            state_dir: root.join("state"),
+            cache_dir: root.join("cache"),
+            runtime_dir: None,
+        }
+    }
+
     /// Create all directories with appropriate permissions.
     pub fn ensure_dirs(&self) -> Result<()> {
         let dirs = [
