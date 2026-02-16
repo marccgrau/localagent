@@ -17,6 +17,7 @@ localgpt chat [OPTIONS]
 | Option | Description |
 |--------|-------------|
 | `--session <ID>` | Resume an existing session by ID |
+| `--resume` | Resume the most recent session |
 | `-m, --model <MODEL>` | Override the default model |
 | `--no-memory` | Disable memory context loading |
 
@@ -53,17 +54,29 @@ Chat sessions have full access to the memory system:
 
 ## Chat Commands
 
-While in chat, these commands are available:
+While in chat, these slash commands are available:
 
-```
-/help           Show this help message
-/quit, /exit    Exit the chat
-/memory <query> Search memory
-/save           Force save context to memory
-/compact        Manually compact session
-/status         Show session info (tokens, turns)
-/clear          Clear the screen
-```
+| Command | Description |
+|---------|-------------|
+| `/help`, `/h`, `/?` | Show available commands |
+| `/quit`, `/exit`, `/q` | Exit the chat |
+| `/new` | Start a fresh session |
+| `/sessions` | List saved sessions |
+| `/resume <id>` | Resume a saved session by ID |
+| `/search <query>` | Search across sessions |
+| `/model [name]` | Show or switch the current model |
+| `/models` | List available model prefixes |
+| `/context` | Show context window usage |
+| `/status` | Show session info (tokens, turns) |
+| `/memory <query>` | Search memory files |
+| `/reindex` | Rebuild memory search index |
+| `/save` | Force save current session |
+| `/compact` | Compact session history |
+| `/export [file]` | Export session as markdown |
+| `/attach <file>` | Attach a file to the conversation |
+| `/attachments` | List pending attachments |
+| `/clear` | Clear the terminal screen |
+| `/skills` | List available skills |
 
 ## Example Session
 

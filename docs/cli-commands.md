@@ -14,8 +14,10 @@ localgpt <COMMAND>
 Commands:
   chat      Interactive multi-turn conversation
   ask       Single question and response
+  gen       Launch 3D scene generation mode (Bevy renderer)
   daemon    Manage the background daemon
   memory    Memory management operations
+  search    Test web search provider
   config    Configuration management
   md        Manage LocalGPT.md standing instructions
   sandbox   Shell sandbox diagnostics
@@ -44,8 +46,10 @@ Options:
 |---------|-------------|
 | [`chat`](/docs/cli-chat) | Interactive multi-turn conversation with session support |
 | [`ask`](/docs/cli-ask) | Single-turn question answering |
+| [`gen`](/docs/gen) | Launch 3D scene generation mode (Bevy renderer) |
 | [`daemon`](/docs/cli-daemon) | Start/stop/status of the background daemon |
 | [`memory`](/docs/cli-memory) | Search, reindex, and manage memory |
+| `search` | Test web search provider configuration |
 | `config` | Init, show, get, and set configuration values |
 | [`md`](/docs/localgpt#quick-reference) | Sign, verify, and audit LocalGPT.md |
 | [`sandbox`](/docs/sandbox#cli-commands) | Inspect sandbox capabilities and run tests |
@@ -87,6 +91,12 @@ localgpt md sign
 
 # View security audit log
 localgpt md audit
+
+# Launch 3D scene generation
+localgpt gen "create a solar system with planets"
+
+# Test web search provider
+localgpt search test
 
 # Show resolved directory paths
 localgpt paths

@@ -16,7 +16,12 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Core Features',
-      items: ['memory-system', 'heartbeat', 'tools', 'skills', 'gen'],
+      items: ['memory-system', 'heartbeat', 'tools', 'skills'],
+    },
+    {
+      type: 'category',
+      label: 'LocalGPT Gen',
+      items: ['gen'],
     },
     {
       type: 'category',

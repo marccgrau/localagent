@@ -42,17 +42,17 @@ The gen agent has access to 11 specialized tools:
 
 | Tool | Description |
 |------|-------------|
+| `gen_scene_info` | Get complete scene hierarchy |
+| `gen_screenshot` | Capture viewport screenshot |
+| `gen_entity_info` | Get detailed info about a named entity |
 | `gen_spawn_primitive` | Spawn geometric primitives (sphere, cube, cylinder, torus, etc.) |
-| `gen_modify_entity` | Modify an existing entity's transform, material, or visibility |
-| `gen_delete_entity` | Remove an entity from the scene |
+| `gen_modify_entity` | Modify entity transform, material, or visibility |
+| `gen_delete_entity` | Remove an entity and its children |
 | `gen_set_camera` | Position and orient the camera |
 | `gen_set_light` | Configure scene lighting |
+| `gen_set_environment` | Set background color and ambient light |
 | `gen_spawn_mesh` | Spawn custom mesh geometry |
-| `gen_screenshot` | Capture a screenshot for visual feedback |
-| `gen_list_entities` | List all entities in the scene |
-| `gen_clear_scene` | Remove all spawned entities |
-| `gen_set_background` | Set the background/clear color |
-| `gen_get_entity` | Get detailed info about a specific entity |
+| `gen_export_screenshot` | Export high-res image to file |
 
 ## Architecture
 

@@ -22,6 +22,39 @@ cargo install localgpt
 cargo install localgpt --no-default-features
 ```
 
+## Optional Features
+
+### Embedding Backend
+
+By default, LocalGPT uses **fastembed** for local vector embeddings — pure Rust, no extra dependencies.
+
+To use a **GGUF embedding model** via llama.cpp instead (requires a C++ compiler):
+
+```bash
+# Install with GGUF embedding support
+cargo install localgpt --features gguf
+```
+
+Then configure the embedding provider in your `config.toml`:
+
+```toml
+[memory]
+embedding_provider = "gguf"
+```
+
+### LocalGPT Gen (3D Scene Generation)
+
+To enable the built-in 3D scene generation mode (adds Bevy as a dependency):
+
+```bash
+cargo install localgpt --features gen
+
+# Or install the standalone Gen binary
+cargo install localgpt-gen
+```
+
+See the [Gen docs](/docs/gen) for usage details.
+
 ## Building from Source
 
 ```bash

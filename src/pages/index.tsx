@@ -29,6 +29,32 @@ function InstallCommand() {
   );
 }
 
+function GenShowcase() {
+  return (
+    <section className={styles.genShowcase}>
+      <div className="container">
+        <div className={styles.genCard}>
+          <div className={styles.genContent}>
+            <h2 className={styles.genTitle}>LocalGPT Gen — AI-Driven 3D Scene Generation</h2>
+            <p className={styles.genDescription}>
+              Type natural language and watch the AI compose 3D scenes from geometric
+              primitives — spheres, cubes, cylinders, tori — with full material control,
+              lighting, and camera positioning. Powered by{' '}
+              <a href="https://bevyengine.org/" target="_blank" rel="noopener noreferrer">Bevy</a>,
+              built into the same single binary.
+            </p>
+            <Link
+              className="button button--primary button--md"
+              to="/docs/gen">
+              Explore Gen Docs
+            </Link>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function HomepageHeader() {
   const {siteConfig} = useDocusaurusContext();
   return (
@@ -70,6 +96,7 @@ export default function Home(): JSX.Element {
       description="LocalGPT - A local AI assistant with persistent memory, autonomous tasks, semantic search, and explorable world generation. Single binary, no runtime dependencies.">
       <HomepageHeader />
       <main>
+        <GenShowcase />
         <HomepageFeatures />
       </main>
     </Layout>
