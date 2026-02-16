@@ -101,6 +101,26 @@ If you're building with AI assistants — whether you're in the OpenClaw communi
 GitHub: https://github.com/localgpt-app/localgpt
 Website: https://localgpt.app
 
+### One more thing...
+
+I don't have access to Project Genie 3, so I made my own (extremely minified) version.
+
+**LocalGPT Gen** is a built-in 3D scene generation mode. You type natural language, and the AI composes 3D scenes from geometric primitives — spheres, cubes, cylinders, tori — with full material control, lighting, and camera positioning. All inside the same single Rust binary, powered by Bevy.
+
+```bash
+# Enable the gen feature and try it
+cargo install localgpt --features gen
+localgpt gen "create a heart outline with spheres and cubes"
+```
+
+The agent gets 11 tools — `gen_spawn_primitive`, `gen_modify_entity`, `gen_set_camera`, `gen_set_light`, `gen_spawn_mesh`, and more — and iteratively builds scenes by spawning shapes, adjusting materials, and positioning the camera. It can see what it built via `gen_screenshot` and course-correct.
+
+Here's a quick demo — "create a heart outline with spheres and cubes" using LocalGPT Gen:
+
+<iframe width="100%" height="400" src="https://www.youtube.com/embed/n18qnSDmBK0" title="LocalGPT Gen — Heart Outline Demo" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+
+**Fair warning:** this is early and I haven't fully validated the results myself. Things work... probably. The architecture is solid — Bevy runs on the main thread, the agent loop runs on a background tokio runtime, and they talk through async mpsc channels — but the actual scene output quality depends heavily on the LLM's spatial reasoning. Consider it a proof of concept and a fun experiment.
+
 ---
 
 ### Appendix: Complete Commit Log

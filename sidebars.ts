@@ -16,7 +16,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Core Features',
-      items: ['memory-system', 'heartbeat', 'tools', 'skills'],
+      items: ['memory-system', 'heartbeat', 'tools', 'skills', 'gen'],
     },
     {
       type: 'category',

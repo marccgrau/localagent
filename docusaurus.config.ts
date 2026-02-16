@@ -4,8 +4,8 @@ import type * as Preset from '@docusaurus/preset-classic';
 
 const config: Config = {
   title: 'LocalGPT',
-  tagline: 'A local AI assistant with persistent markdown memory, autonomous heartbeat tasks, and semantic search. Single binary, no runtime dependencies.',
-  // favicon: 'img/favicon.ico',
+  tagline: 'A local AI assistant with persistent memory, autonomous tasks, semantic search, and explorable world generation. Single binary, no runtime dependencies.',
+  favicon: 'logo/localgpt-icon.png',
 
   url: 'https://localgpt.app',
   baseUrl: '/',
@@ -49,6 +49,10 @@ const config: Config = {
     image: 'logo/localgpt-logo-dark.svg',
     navbar: {
       title: 'LocalGPT',
+      logo: {
+        alt: 'LocalGPT',
+        src: 'logo/localgpt-icon.png',
+      },
       items: [
         {
           type: 'docSidebar',

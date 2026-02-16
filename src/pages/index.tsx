@@ -35,13 +35,18 @@ function HomepageHeader() {
     <header className={clsx('hero hero--dark', styles.heroBanner)}>
       <div className="container">
         <img
+          src="/logo/localgpt-icon.png"
+          alt={siteConfig.title}
+          className={styles.heroIcon}
+        />
+        <img
           src="/logo/localgpt.gif"
           alt={siteConfig.title}
           className={styles.heroLogo}
         />
         <InstallCommand />
         <p className="hero__subtitle">
-          A local AI assistant with persistent markdown memory, autonomous heartbeat tasks, and semantic search.
+          A local AI assistant with persistent memory, autonomous tasks, semantic search, and explorable world generation.
           <br />
           Single binary, no runtime dependencies.
         </p>
@@ -62,7 +67,7 @@ export default function Home(): JSX.Element {
   return (
     <Layout
       title="Home"
-      description="LocalGPT - A local AI assistant with persistent markdown memory, autonomous heartbeat tasks, and semantic search. Single binary, no runtime dependencies.">
+      description="LocalGPT - A local AI assistant with persistent memory, autonomous tasks, semantic search, and explorable world generation. Single binary, no runtime dependencies.">
       <HomepageHeader />
       <main>
         <HomepageFeatures />
