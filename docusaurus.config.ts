@@ -49,10 +49,6 @@ const config: Config = {
     image: 'logo/localgpt-logo-dark.svg',
     navbar: {
       title: 'LocalGPT',
-      logo: {
-        alt: 'LocalGPT',
-        src: 'logo/localgpt-icon-app.png',
-      },
       items: [
         {
           type: 'docSidebar',
@@ -64,13 +60,13 @@ const config: Config = {
         {
           href: 'https://www.youtube.com/@localgpt-app',
           position: 'right',
-          className: 'header-youtube-link',
+          className: 'header-localgpt-app-link',
           'aria-label': 'YouTube',
         },
         {
           href: 'https://www.youtube.com/@localgpt-gen',
           position: 'right',
-          className: 'header-youtube-link',
+          className: 'header-localgpt-gen-link',
           'aria-label': 'YouTube Gen Gallery',
         },
         {
