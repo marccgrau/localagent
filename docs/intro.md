@@ -5,11 +5,11 @@ slug: /intro
 
 # Introduction
 
-LocalGPT is a **local AI assistant with persistent memory, semantic search, and autonomous operation** — built in Rust, inspired by OpenClaw. A single ~27MB binary gives you a CLI, desktop app, embedded web UI, and HTTP API — all keeping your data on your machine.
+LocalGPT is a **local AI assistant with persistent memory, semantic search, and autonomous operation** — built in Rust, inspired by OpenClaw. A single binary gives you a CLI, desktop app, embedded web UI, and HTTP API — all keeping your data on your machine.
 
 ## Key Features
 
-- **Local & Private** - Single ~27MB Rust binary. All data stays on your machine. No cloud storage, no telemetry.
+- **Local & Private** - Single Rust binary. All data stays on your machine. No cloud storage, no telemetry.
 - **Hybrid Memory Search** - Markdown-based knowledge store with SQLite FTS5 full-text search (with AND matching and rank-based scoring) and local vector embeddings (fastembed) for semantic search
 - **Desktop App** - Optional native desktop GUI built with egui — chat, sessions, memory browser, and status dashboard. Disable with `--no-default-features` for headless/Docker deployments.
 - **Embedded Web UI** - Browser-based chat interface served directly from the binary

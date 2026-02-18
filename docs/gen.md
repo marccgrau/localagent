@@ -21,20 +21,36 @@ LocalGPT Gen is an early-stage experimental feature. Scene output quality depend
 ## Installation
 
 ```bash
-# Preferred — standalone binary
+# Install the standalone Gen binary
 cargo install localgpt-gen
 
-# Or enable the gen feature on the main crate
-cargo install localgpt --features gen
+# Or from a source checkout
+cargo install --path crates/gen
 ```
 
 ## Usage
 
 ```bash
-localgpt gen "create a heart outline with spheres and cubes"
+# Interactive mode — type prompts in the terminal
+localgpt-gen
+
+# Start with an initial prompt
+localgpt-gen "create a heart outline with spheres and cubes"
+
+# Load an existing glTF/GLB scene
+localgpt-gen --scene ./scene.glb
+
+# Verbose logging
+localgpt-gen --verbose
+
+# Combine options
+localgpt-gen -v -s ./scene.glb "add warm lighting"
+
+# Custom agent ID (default: "gen")
+localgpt-gen --agent my-gen-agent
 ```
 
-The agent receives your prompt and iteratively builds a world — spawning shapes, adjusting materials, positioning the camera, and taking screenshots to course-correct.
+The agent receives your prompt and iteratively builds a world — spawning shapes, adjusting materials, positioning the camera, and taking screenshots to course-correct. Type `/quit` or `/exit` in the terminal to close.
 
 ## Gen Tools
 
@@ -78,4 +94,3 @@ Bevy requires ownership of the main thread (macOS windowing/GPU requirement), so
 - Visual output depends on the LLM's spatial reasoning ability
 - Only geometric primitives are supported (no imported 3D models yet)
 - Requires a GPU-capable display for rendering
-- The `gen` feature adds Bevy as a dependency, significantly increasing compile time

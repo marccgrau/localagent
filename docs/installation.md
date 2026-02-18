@@ -44,12 +44,9 @@ embedding_provider = "gguf"
 
 ### LocalGPT Gen (World Generation)
 
-To enable the built-in world generation mode (adds Bevy as a dependency):
+Gen is a separate binary — it does not add Bevy to the main CLI binary:
 
 ```bash
-cargo install localgpt --features gen
-
-# Or install the standalone Gen binary
 cargo install localgpt-gen
 ```
 

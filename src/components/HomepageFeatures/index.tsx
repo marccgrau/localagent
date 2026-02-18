@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import Heading from '@theme/Heading';
+import Link from '@docusaurus/Link';
 import styles from './styles.module.css';
 
 type FeatureItem = {
@@ -12,7 +13,7 @@ const FeatureList: FeatureItem[] = [
     title: 'Local & Private',
     description: (
       <>
-        Single Rust binary, ~27MB. All data stays on your machine — markdown
+        Single Rust binary. All data stays on your machine — markdown
         files, SQLite indexes, and local embeddings. No cloud storage, no
         telemetry. Just <code>cargo install localgpt</code>.
       </>
@@ -65,10 +66,19 @@ const FeatureList: FeatureItem[] = [
     description: (
       <>
         Kernel-enforced shell sandbox (Landlock + seccomp + Seatbelt) on
-        every command — no Docker required. Signed workspace security policies
-        with HMAC tamper detection, protected files, and hash-chained audit logs.
-        Defense in depth, not a guarantee — no system is absolutely secure,
-        and LLM agents are inherently probabilistic.
+        every command — no Docker required.
+      </>
+    ),
+  },
+  {
+    title: 'Tamper Detection & Audit Chain',
+    description: (
+      <>
+        Sign custom rules in <Link to="/docs/localgpt"><code>LocalGPT.md</code></Link> with HMAC-SHA256.
+        Verification runs at session start; tampering is detected. Protected
+        files blocked from writes. All security events logged to an immutable,
+        hash-chained audit file. Defense in depth — not a guarantee, and LLM
+        agents are inherently probabilistic.
       </>
     ),
   },
