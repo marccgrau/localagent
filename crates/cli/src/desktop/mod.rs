@@ -10,4 +10,3 @@ mod views;
 mod worker;
 
 pub use app::DesktopApp;
-pub use worker::WorkerHandle;

@@ -36,6 +36,10 @@ fn main() -> Result<()> {
         )
         .init();
 
+    // Load config early so both Bevy and agent threads can use it
+    let config = localgpt_core::config::Config::load()?;
+    let workspace = config.workspace_path();
+
     // Create the channel pair
     let (bridge, channels) = gen3d::create_gen_channels();
 
@@ -53,18 +57,20 @@ fn main() -> Result<()> {
             .expect("Failed to build tokio runtime for gen agent");
 
         rt.block_on(async move {
-            if let Err(e) = run_agent_loop(bridge_for_agent, &agent_id, initial_prompt).await {
+            if let Err(e) =
+                run_agent_loop(bridge_for_agent, &agent_id, initial_prompt, config).await
+            {
                 tracing::error!("Gen agent loop error: {}", e);
             }
         });
     });
 
     // Run Bevy on the main thread
-    run_bevy_app(channels)
+    run_bevy_app(channels, workspace)
 }
 
 /// Set up and run the Bevy application on the main thread.
-fn run_bevy_app(channels: gen3d::GenChannels) -> Result<()> {
+fn run_bevy_app(channels: gen3d::GenChannels, workspace: std::path::PathBuf) -> Result<()> {
     use bevy::prelude::*;
 
     let mut app = App::new();
@@ -82,7 +88,7 @@ fn run_bevy_app(channels: gen3d::GenChannels) -> Result<()> {
             .disable::<bevy::log::LogPlugin>(),
     );
 
-    gen3d::plugin::setup_gen_app(&mut app, channels);
+    gen3d::plugin::setup_gen_app(&mut app, channels, workspace);
 
     app.run();
 
@@ -94,16 +100,13 @@ async fn run_agent_loop(
     bridge: std::sync::Arc<gen3d::GenBridge>,
     agent_id: &str,
     initial_prompt: Option<String>,
+    config: localgpt_core::config::Config,
 ) -> Result<()> {
     use localgpt_core::agent::Agent;
     use localgpt_core::agent::tools::create_safe_tools;
-    use localgpt_core::config::Config;
     use localgpt_core::memory::MemoryManager;
     use std::io::{self, Write};
     use std::sync::Arc;
-
-    // Load config
-    let config = Config::load()?;
 
     // Set up memory
     let memory = MemoryManager::new_with_agent(&config.memory, agent_id)?;

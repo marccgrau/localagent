@@ -35,6 +35,7 @@ pub enum UiMessage {
 
 /// Message from worker to UI
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum WorkerMessage {
     /// Agent is ready
     Ready {

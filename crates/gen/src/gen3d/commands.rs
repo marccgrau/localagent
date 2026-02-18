@@ -40,7 +40,7 @@ pub enum GenCommand {
         height: u32,
     },
     ExportGltf {
-        path: String,
+        path: Option<String>,
     },
 }
 

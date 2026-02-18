@@ -14,6 +14,7 @@ pub struct GenEntity {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum GenEntityType {
     Primitive,
     Light,
@@ -41,6 +42,7 @@ pub struct NameRegistry {
     entity_to_name: HashMap<Entity, String>,
 }
 
+#[allow(dead_code)]
 impl NameRegistry {
     pub fn insert(&mut self, name: String, entity: Entity) {
         self.name_to_entity.insert(name.clone(), entity);

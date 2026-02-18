@@ -6,9 +6,17 @@ use bevy::render::mesh::{Indices, VertexAttributeValues};
 use bevy::render::render_asset::RenderAssetUsages;
 use bevy::render::render_resource::PrimitiveTopology;
 
+use std::path::PathBuf;
+
 use super::GenChannels;
 use super::commands::*;
 use super::registry::*;
+
+/// Bevy resource holding the workspace path for default export locations.
+#[derive(Resource, Clone)]
+pub struct GenWorkspace {
+    pub path: PathBuf,
+}
 
 /// Bevy resource wrapping the channel endpoints.
 #[derive(Resource)]
@@ -57,6 +65,7 @@ impl Default for FlyCamConfig {
 }
 
 /// Plugin that sets up the Gen 3D environment.
+#[allow(dead_code)]
 pub struct GenPlugin {
     pub channels: GenChannels,
 }
@@ -72,8 +81,9 @@ impl Plugin for GenPlugin {
 /// Initialize the Gen world: channels, default scene, systems.
 ///
 /// Call this instead of using Plugin::build since we need to move the channels.
-pub fn setup_gen_app(app: &mut App, channels: GenChannels) {
+pub fn setup_gen_app(app: &mut App, channels: GenChannels, workspace: PathBuf) {
     app.insert_resource(GenChannelRes::new(channels))
+        .insert_resource(GenWorkspace { path: workspace })
         .init_resource::<NameRegistry>()
         .init_resource::<PendingScreenshots>()
         .init_resource::<FlyCamConfig>()
@@ -158,6 +168,7 @@ fn process_gen_commands(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut registry: ResMut<NameRegistry>,
     mut pending_screenshots: ResMut<PendingScreenshots>,
+    workspace: Res<GenWorkspace>,
     transforms: Query<&Transform>,
     gen_entities: Query<&GenEntity>,
     names_query: Query<&Name>,
@@ -244,7 +255,8 @@ fn process_gen_commands(
                 continue;
             }
             GenCommand::ExportGltf { path } => handle_export_gltf(
-                &path,
+                path.as_deref(),
+                &workspace,
                 &registry,
                 &transforms,
                 &gen_entities,
@@ -860,7 +872,8 @@ fn handle_spawn_mesh(
 
 #[allow(clippy::too_many_arguments)]
 fn handle_export_gltf(
-    path: &str,
+    path: Option<&str>,
+    workspace: &GenWorkspace,
     registry: &NameRegistry,
     transforms: &Query<&Transform>,
     gen_entities: &Query<&GenEntity>,
@@ -873,14 +886,30 @@ fn handle_export_gltf(
     use gltf_json::validation::Checked::Valid;
     use gltf_json::validation::USize64;
 
-    // Ensure path has .glb extension
-    let output_path = if std::path::Path::new(path)
-        .extension()
-        .is_some_and(|ext| ext.eq_ignore_ascii_case("glb") || ext.eq_ignore_ascii_case("gltf"))
-    {
-        path.to_string()
-    } else {
-        format!("{}.glb", path)
+    // Resolve output path: use provided path or default to {workspace}/exports/{timestamp}.glb
+    let output_path = match path {
+        Some(p) if !p.is_empty() => {
+            // Ensure path has .glb/.gltf extension
+            if std::path::Path::new(p).extension().is_some_and(|ext| {
+                ext.eq_ignore_ascii_case("glb") || ext.eq_ignore_ascii_case("gltf")
+            }) {
+                p.to_string()
+            } else {
+                format!("{}.glb", p)
+            }
+        }
+        _ => {
+            // Default: {workspace}/exports/{timestamp}.glb
+            let timestamp = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            let exports_dir = workspace.path.join("exports");
+            exports_dir
+                .join(format!("{}.glb", timestamp))
+                .to_string_lossy()
+                .into_owned()
+        }
     };
 
     let mut root = gltf_json::Root::default();

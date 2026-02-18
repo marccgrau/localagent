@@ -40,7 +40,6 @@ pub fn create_safe_tools(
     config: &Config,
     memory: Option<Arc<MemoryManager>>,
 ) -> Result<Vec<Box<dyn Tool>>> {
-    use super::hardcoded_filters;
     use super::tool_filters::CompiledToolFilter;
 
     let workspace = config.workspace_path();

@@ -919,20 +919,19 @@ impl Tool for GenExportGltfTool {
                 "properties": {
                     "path": {
                         "type": "string",
-                        "description": "Output file path (.glb extension added if missing)"
+                        "description": "Output file path (.glb extension added if missing). If omitted, exports to {workspace}/exports/{timestamp}.glb"
                     }
-                },
-                "required": ["path"]
+                }
             }),
         }
     }
 
     async fn execute(&self, arguments: &str) -> Result<String> {
         let args: Value = serde_json::from_str(arguments)?;
-        let path = args["path"]
-            .as_str()
-            .ok_or_else(|| anyhow::anyhow!("Missing path"))?
-            .to_string();
+        let path = args
+            .get("path")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
 
         match self.bridge.send(GenCommand::ExportGltf { path }).await? {
             GenResponse::Exported { path } => Ok(format!("Exported scene to: {}", path)),

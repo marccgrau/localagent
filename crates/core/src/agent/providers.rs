@@ -753,10 +753,10 @@ impl XaiProvider {
                 if let Some(content_parts) = item["content"].as_array() {
                     for part in content_parts {
                         let part_type = part["type"].as_str().unwrap_or("");
-                        if part_type == "output_text" || part_type == "text" {
-                            if let Some(chunk) = part["text"].as_str() {
-                                text.push_str(chunk);
-                            }
+                        if (part_type == "output_text" || part_type == "text")
+                            && let Some(chunk) = part["text"].as_str()
+                        {
+                            text.push_str(chunk);
                         }
                     }
                 } else if let Some(content) = item["content"].as_str() {

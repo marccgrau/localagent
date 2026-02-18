@@ -87,33 +87,30 @@ impl HeartbeatRunner {
 
     async fn first_delay(&self) -> Duration {
         // Read last heartbeat event to calibrate first tick time
-        if let Ok(json) = fs::read_to_string(self.config.paths.last_heartbeat()) {
-            if let Ok(event) = serde_json::from_str::<HeartbeatEvent>(&json) {
-                let last_tick_end = std::time::UNIX_EPOCH + Duration::from_millis(event.ts as u64);
-                let last_tick_elapsed = Duration::from_millis(event.duration_ms as u64);
-                let last_tick = last_tick_end - last_tick_elapsed;
-                debug!(
-                    name: "Heartbeat",
-                    "loaded last_tick: {:?} (ts: {}, duration_ms: {})",
-                    last_tick, event.ts, event.duration_ms
-                );
+        if let Ok(json) = fs::read_to_string(self.config.paths.last_heartbeat())
+            && let Ok(event) = serde_json::from_str::<HeartbeatEvent>(&json)
+        {
+            let last_tick_end = std::time::UNIX_EPOCH + Duration::from_millis(event.ts);
+            let last_tick_elapsed = Duration::from_millis(event.duration_ms);
+            let last_tick = last_tick_end - last_tick_elapsed;
+            debug!(
+                name: "Heartbeat",
+                "loaded last_tick: {:?} (ts: {}, duration_ms: {})",
+                last_tick, event.ts, event.duration_ms
+            );
 
-                let next_tick = last_tick + self.interval;
-                let now = SystemTime::now();
-                if now < next_tick {
-                    return next_tick.duration_since(now).unwrap_or(Duration::ZERO);
-                }
+            let next_tick = last_tick + self.interval;
+            let now = SystemTime::now();
+            if now < next_tick {
+                return next_tick.duration_since(now).unwrap_or(Duration::ZERO);
             }
         }
 
         // heartbeat is overdue
-        return parse_duration(&self.config.heartbeat.overdue_delay).map_or_else(
-            |e| {
-                warn!(name: "Heartbeat", "invalid overdue_delay: {}, falling back to zero", e);
-                Duration::ZERO
-            },
-            |d| d,
-        );
+        parse_duration(&self.config.heartbeat.overdue_delay).unwrap_or_else(|e| {
+            warn!(name: "Heartbeat", "invalid overdue_delay: {}, falling back to zero", e);
+            Duration::ZERO
+        })
     }
 
     /// Run the heartbeat loop continuously
@@ -206,13 +203,13 @@ impl HeartbeatRunner {
             };
 
             // Persist any non-transient heartbeat event to disk
-            if event.status != HeartbeatStatus::SkippedMayTry {
-                if let Err(e) = serde_json::to_writer_pretty(
+            if event.status != HeartbeatStatus::SkippedMayTry
+                && let Err(e) = serde_json::to_writer_pretty(
                     fs::File::create(self.config.paths.last_heartbeat())?,
                     &event,
-                ) {
-                    warn!(name: "Heartbeat", "failed to write event: {}", e);
-                }
+                )
+            {
+                warn!(name: "Heartbeat", "failed to write event: {}", e);
             }
 
             emit_heartbeat_event(event);
