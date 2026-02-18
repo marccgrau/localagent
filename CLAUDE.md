@@ -129,6 +129,20 @@ Mobile crate uses `default-features = false, features = ["embeddings-openai"]` �
 - **telegram.rs** — Telegram bot with 6-digit pairing auth, streaming edits, agent ID `"telegram"`
 - Optional `egui-web` feature for WASM web UI
 
+### Gen (3D Scene Generation with Audio)
+
+**Binary:** `localgpt-gen` — Bevy-based 3D scene generation with procedural environmental audio.
+
+**Audio System:**
+- **Engine:** FunDSP v0.20 for procedural synthesis, cpal for audio output
+- **Architecture:** 3-thread model (Bevy main → audio mgmt thread → cpal callback) with lock-free `Shared<f32>` parameters
+- **Ambient sounds:** Wind, Rain, Forest, Ocean, Cave, Stream, Silence (with LFO variation)
+- **Emitter sounds:** Water, Fire, Hum, Wind, Custom waveforms (spatial, distance-attenuated)
+- **Auto-inference:** Entity names like "campfire", "waterfall", "stream" automatically get sounds
+- **Tools:** `gen_set_ambience`, `gen_audio_emitter`, `gen_modify_audio`, `gen_audio_info`
+
+See `docs/gen-audio.md` for detailed architecture and usage examples.
+
 ### Mobile
 
 UniFFI proc-macro bindings (`crates/mobile/`). `LocalGPTClient` owns its own tokio runtime and wraps `AgentHandle`. Error type: `MobileError` enum (Init, Chat, Memory, Config).
