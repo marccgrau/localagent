@@ -1,4 +1,5 @@
 pub mod ask;
+pub mod auth;
 pub mod chat;
 pub mod config;
 pub mod daemon;
@@ -77,4 +78,7 @@ pub enum Commands {
 
     /// Test and manage web search
     Search(search::SearchArgs),
+
+    /// Authenticate with providers (Gemini, etc.)
+    Auth(auth::AuthArgs),
 }

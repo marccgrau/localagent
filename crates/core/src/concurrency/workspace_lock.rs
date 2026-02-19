@@ -11,7 +11,7 @@ use std::path::PathBuf;
 
 /// Advisory file lock for the agent workspace.
 ///
-/// Lock file lives at `~/.localgpt/workspace.lock` (outside the workspace
+/// Lock file lives at `~/.local/state/localgpt/workspace.lock` (outside the workspace
 /// to avoid git/watcher noise).
 #[derive(Clone)]
 pub struct WorkspaceLock {

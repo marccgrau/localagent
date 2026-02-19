@@ -31,3 +31,4 @@ target
 crates/server/ui/egui/*.wasm
 crates/server/ui/egui/*.js
 crates/server/ui/egui/*.d.ts
+opencode.json

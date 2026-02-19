@@ -21,7 +21,7 @@ pub const PROTECTED_FILES: &[&str] = &["LocalGPT.md", ".localgpt_manifest.json",
 /// Files outside the workspace (in the state directory) that the agent
 /// must not access.
 ///
-/// The device key and audit log live in `~/.localgpt/` (the state
+/// The device key and audit log live in `~/.local/state/localgpt/` (the state
 /// directory), which is outside the workspace and not indexed by memory.
 /// These paths are checked as filename suffixes for defense in depth.
 pub const PROTECTED_EXTERNAL_PATHS: &[&str] = &["localgpt.device.key", "localgpt.audit.jsonl"];
@@ -146,7 +146,7 @@ mod tests {
     fn path_with_directory_checks_filename() {
         assert!(is_workspace_file_protected("workspace/LocalGPT.md"));
         assert!(is_workspace_file_protected(
-            "/home/user/.localgpt/workspace/IDENTITY.md"
+            "/home/user/.local/share/localgpt/workspace/IDENTITY.md"
         ));
     }
 

@@ -3,6 +3,7 @@
 //! Builds the system prompt with identity, safety guardrails, workspace info,
 //! and special token handling (NO_REPLY, HEARTBEAT_OK).
 
+use crate::paths::DEFAULT_DATA_DIR_STR;
 use std::path::Path;
 
 /// Special tokens for silent replies
@@ -192,7 +193,7 @@ pub fn build_system_prompt(params: SystemPromptParams) -> String {
 
 /// Parameters for building the system prompt
 pub struct SystemPromptParams<'a> {
-    pub workspace_dir: &'a str,
+    pub workspace_dir: String,
     pub model: &'a str,
     pub tool_names: Vec<&'a str>,
     pub hostname: Option<String>,
@@ -210,9 +211,13 @@ impl<'a> SystemPromptParams<'a> {
         let timezone = now.format("%Z").to_string();
 
         Self {
-            workspace_dir: workspace.to_str().unwrap_or("~/.localgpt/workspace"),
+            workspace_dir: workspace
+                .to_str()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| format!("{}/workspace", DEFAULT_DATA_DIR_STR)),
             model,
             tool_names: Vec::new(),
+
             hostname: std::env::var("HOSTNAME")
                 .or_else(|_| std::env::var("HOST"))
                 .ok(),

@@ -82,8 +82,8 @@ pub enum PolicyVerification {
 ///
 /// # Arguments
 ///
-/// * `workspace` — Path to `~/.localgpt/workspace/`
-/// * `state_dir` — Path to `~/.localgpt/` (contains `.device_key`)
+/// * `workspace` — Path to `~/.local/share/localgpt/workspace/`
+/// * `state_dir` — Path to `~/.local/state/localgpt/` (contains `.device_key`)
 pub fn load_and_verify_policy(workspace: &Path, state_dir: &Path) -> PolicyVerification {
     let policy_path = workspace.join(super::localgpt::POLICY_FILENAME);
 

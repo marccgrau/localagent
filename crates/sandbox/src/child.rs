@@ -98,7 +98,7 @@ fn exec_bash(command: &str) -> ! {
     {
         // On macOS, apply_sandbox sets _LOCALGPT_SBPL_PROFILE env var.
         // If set, exec through sandbox-exec instead of plain bash.
-        if std::env::var("_LOCALGPT_SBPL_PROFILE").is_ok() {
+        if std::env::var(localgpt_core::env::_LOCALGPT_SBPL_PROFILE).is_ok() {
             crate::macos::exec_sandboxed(command);
         }
     }

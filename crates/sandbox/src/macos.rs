@@ -11,7 +11,7 @@ pub fn apply_sandbox(policy: &SandboxPolicy) -> Result<(), String> {
     // Store profile in env for the child's exec_bash to pick up.
     // On macOS, the child execs sandbox-exec instead of bash directly.
     // SAFETY: called before spawning the sandboxed child process
-    unsafe { std::env::set_var("_LOCALGPT_SBPL_PROFILE", &profile) };
+    unsafe { std::env::set_var(localgpt_core::env::_LOCALGPT_SBPL_PROFILE, &profile) };
 
     Ok(())
 }
@@ -21,7 +21,7 @@ pub fn apply_sandbox(policy: &SandboxPolicy) -> Result<(), String> {
 pub fn exec_sandboxed(command: &str) -> ! {
     use std::os::unix::process::CommandExt;
 
-    let profile = std::env::var("_LOCALGPT_SBPL_PROFILE").unwrap_or_default();
+    let profile = std::env::var(localgpt_core::env::_LOCALGPT_SBPL_PROFILE).unwrap_or_default();
 
     if profile.is_empty() {
         let err = std::process::Command::new("/bin/bash")

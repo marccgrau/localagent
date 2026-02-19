@@ -1,7 +1,7 @@
 //! Cryptographic signing and verification for `LocalGPT.md`.
 //!
 //! Uses HMAC-SHA256 with a device-local 32-byte key to sign the user's
-//! security policy file. The key is stored at `~/.localgpt/.device_key`
+//! security policy file. The key is stored at `~/.local/share/localgpt/localgpt.device.key`
 //! (0600 permissions on Unix) and is never exposed to the agent's tool
 //! sandbox.
 //!
@@ -128,8 +128,8 @@ pub fn compute_hmac(key: &[u8; DEVICE_KEY_LEN], content: &str) -> Result<String>
 ///
 /// # Arguments
 ///
-/// * `state_dir` — Path to `~/.localgpt/` (contains `.device_key`).
-/// * `workspace` — Path to `~/.localgpt/workspace/` (contains `LocalGPT.md`).
+/// * `state_dir` — Path to `~/.local/state/localgpt/` (contains `.device_key`).
+/// * `workspace` — Path to `~/.local/share/localgpt/workspace/` (contains `LocalGPT.md`).
 /// * `signed_by` — Who triggered the signing: `"cli"` or `"gui"`.
 pub fn sign_policy(state_dir: &Path, workspace: &Path, signed_by: &str) -> Result<Manifest> {
     let policy_path = workspace.join(super::localgpt::POLICY_FILENAME);

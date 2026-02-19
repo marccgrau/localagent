@@ -1,6 +1,6 @@
 //! Append-only, hash-chained security audit log.
 //!
-//! Stored at `~/.localgpt/.security_audit.jsonl` (outside the workspace,
+//! Stored at `~/.local/state/localgpt/localgpt.audit.jsonl` (outside the workspace,
 //! in the state directory). Each entry contains a SHA-256 hash of the
 //! previous entry, forming a tamper-evident chain.
 //!
@@ -91,7 +91,7 @@ pub enum AuditAction {
 ///
 /// # Arguments
 ///
-/// * `state_dir` — Path to `~/.localgpt/` (contains the audit log).
+/// * `state_dir` — Path to `~/.local/state/localgpt/` (contains the audit log).
 /// * `action` — What security event occurred.
 /// * `content_sha256` — SHA-256 of the policy content (empty string if N/A).
 /// * `source` — Who triggered the action.

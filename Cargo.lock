@@ -5332,15 +5332,19 @@ dependencies = [
  "localgpt-server",
  "nix 0.31.1",
  "rand 0.10.0",
+ "reqwest 0.13.2",
  "rustyline",
  "serde",
  "serde_json",
+ "serde_urlencoded",
+ "sha2",
  "shellexpand",
  "tempfile",
  "tokio",
  "toml 1.0.2+spec-1.1.0",
  "tracing",
  "tracing-subscriber",
+ "url",
 ]
 
 [[package]]
@@ -7542,6 +7546,7 @@ dependencies = [
  "js-sys",
  "log",
  "mime",
+ "mime_guess",
  "percent-encoding",
  "pin-project-lite",
  "quinn",

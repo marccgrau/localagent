@@ -9,7 +9,9 @@ use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::PathBuf;
 
+use crate::env::LOCALGPT_WORKSPACE;
 use crate::paths::Paths;
+use crate::paths::{DEFAULT_DATA_DIR_STR, DEFAULT_STATE_DIR_STR};
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Config {
@@ -575,7 +577,7 @@ fn default_overdue_delay() -> String {
     "1m".to_string()
 }
 fn default_workspace() -> String {
-    "~/.local/share/localgpt/workspace".to_string()
+    format!("{}/workspace", DEFAULT_DATA_DIR_STR)
 }
 fn default_embedding_provider() -> String {
     "local".to_string() // Local embeddings via fastembed (no API key needed)
@@ -584,7 +586,7 @@ fn default_embedding_model() -> String {
     "all-MiniLM-L6-v2".to_string() // Local model via fastembed (no API key needed)
 }
 fn default_embedding_cache_dir() -> String {
-    "~/.cache/localgpt/embeddings".to_string()
+    crate::paths::DEFAULT_CACHE_DIR_STR.to_string() + "/embeddings"
 }
 fn default_chunk_size() -> usize {
     400
@@ -614,7 +616,7 @@ fn default_log_level() -> String {
     "info".to_string()
 }
 fn default_log_file() -> String {
-    "~/.local/state/localgpt/logs/agent.log".to_string()
+    format!("{}/logs/agent.log", DEFAULT_STATE_DIR_STR)
 }
 fn default_sandbox_level() -> String {
     "auto".to_string()
@@ -746,7 +748,7 @@ impl Config {
 
         // Apply deprecated memory.workspace override if set and LOCALGPT_WORKSPACE not set
         if config.memory.workspace != default_workspace()
-            && std::env::var("LOCALGPT_WORKSPACE").is_err()
+            && std::env::var(LOCALGPT_WORKSPACE).is_err()
         {
             let expanded = shellexpand::tilde(&config.memory.workspace);
             let ws_path = PathBuf::from(expanded.to_string());

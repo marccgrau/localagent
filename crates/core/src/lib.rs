@@ -8,6 +8,7 @@ pub mod agent;
 pub mod commands;
 pub mod concurrency;
 pub mod config;
+pub mod env;
 pub mod heartbeat;
 pub mod memory;
 pub mod paths;

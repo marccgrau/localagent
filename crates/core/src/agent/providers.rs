@@ -18,6 +18,7 @@ use tracing::debug;
 use tracing::{debug, info};
 
 use crate::config::Config;
+use crate::paths::DEFAULT_CONFIG_DIR_STR;
 
 /// Image attachment for multimodal messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -282,12 +283,13 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
                 let anthropic_config = config.providers.anthropic.as_ref().ok_or_else(|| {
                     anyhow::anyhow!(
                         "Anthropic provider not configured.\n\
-                        Set ANTHROPIC_API_KEY env var or add to ~/.localgpt/config.toml:\n\n\
+                        Set ANTHROPIC_API_KEY env var or add to {}/config.toml:\n\n\
                         [providers.anthropic]\n\
                         api_key = \"sk-ant-...\"\n\n\
                         Or use OAuth subscription credentials:\n\n\
                         [providers.anthropic_oauth]\n\
-                        access_token = \"${{ANTHROPIC_OAUTH_TOKEN}}\""
+                        access_token = \"${{ANTHROPIC_OAUTH_TOKEN}}\"",
+                        DEFAULT_CONFIG_DIR_STR
                     )
                 })?;
 
@@ -305,9 +307,10 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             let openai_config = config.providers.openai.as_ref().ok_or_else(|| {
                 anyhow::anyhow!(
                     "OpenAI provider not configured.\n\
-                    Set OPENAI_API_KEY env var or add to ~/.localgpt/config.toml:\n\n\
+                    Set OPENAI_API_KEY env var or add to {}/config.toml:\n\n\
                     [providers.openai]\n\
-                    api_key = \"sk-...\""
+                    api_key = \"sk-...\"",
+                    DEFAULT_CONFIG_DIR_STR
                 )
             })?;
 
@@ -322,9 +325,10 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             let xai_config = config.providers.xai.as_ref().ok_or_else(|| {
                 anyhow::anyhow!(
                     "xAI provider not configured.\n\
-                    Set XAI_API_KEY env var or add to ~/.localgpt/config.toml:\n\n\
+                    Set XAI_API_KEY env var or add to {}/config.toml:\n\n\
                     [providers.xai]\n\
-                    api_key = \"xai-...\""
+                    api_key = \"xai-...\"",
+                    DEFAULT_CONFIG_DIR_STR
                 )
             })?;
 
@@ -355,9 +359,10 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             let ollama_config = config.providers.ollama.as_ref().ok_or_else(|| {
                 anyhow::anyhow!(
                     "Ollama provider not configured.\n\
-                    Add to ~/.localgpt/config.toml:\n\n\
+                    Add to {}/config.toml:\n\n\
                     [providers.ollama]\n\
-                    endpoint = \"http://localhost:11434\""
+                    endpoint = \"http://localhost:11434\"",
+                    DEFAULT_CONFIG_DIR_STR
                 )
             })?;
 
@@ -371,9 +376,10 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             let glm_config = config.providers.glm.as_ref().ok_or_else(|| {
                 anyhow::anyhow!(
                     "GLM provider not configured.\n\
-                    Set GLM_API_KEY env var or add to ~/.localgpt/config.toml:\n\n\
+                    Set GLM_API_KEY env var or add to {}/config.toml:\n\n\
                     [providers.glm]\n\
-                    api_key = \"your-glm-api-key\""
+                    api_key = \"your-glm-api-key\"",
+                    DEFAULT_CONFIG_DIR_STR
                 )
             })?;
 
@@ -388,11 +394,12 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             let gemini_config = config.providers.gemini_oauth.as_ref().ok_or_else(|| {
                 anyhow::anyhow!(
                     "Gemini OAuth provider not configured.\n\
-                    Add to ~/.localgpt/config.toml:\n\n\
+                    Add to {}/config.toml:\n\n\
                     [providers.gemini_oauth]\n\
                     access_token = \"${{GEMINI_OAUTH_TOKEN}}\"\n\
                     # Optional: refresh_token for automatic token renewal\n\
-                    # Optional: project_id for enterprise/subscription plans"
+                    # Optional: project_id for enterprise/subscription plans",
+                    DEFAULT_CONFIG_DIR_STR
                 )
             })?;
 
@@ -2725,8 +2732,13 @@ impl GeminiOAuthProvider {
         model: &str,
         project_id: Option<&str>,
     ) -> Result<Self> {
+        let client = Client::builder()
+            .http1_only()
+            .timeout(std::time::Duration::from_secs(60))
+            .build()?;
+
         Ok(Self {
-            client: Client::new(),
+            client,
             access_token: access_token.to_string(),
             base_url: base_url.to_string(),
             model: model.to_string(),
@@ -2789,7 +2801,7 @@ impl GeminiOAuthProvider {
                 Role::Tool => {
                     if let Some(ref tool_call_id) = m.tool_call_id {
                         formatted.push(json!({
-                            "role": "user",
+                            "role": "function",
                             "parts": [{
                                 "function_response": {
                                     "name": tool_call_id,
@@ -2882,11 +2894,21 @@ impl LLMProvider for GeminiOAuthProvider {
             .send()
             .await?;
 
-        let response_body: Value = response.json().await?;
-        debug!(
-            "Gemini OAuth response: {}",
-            serde_json::to_string_pretty(&response_body)?
-        );
+        let status = response.status();
+        let response_text = response.text().await?;
+        debug!("Gemini OAuth response ({}): {}", status, response_text);
+
+        let response_body: Value = match serde_json::from_str(&response_text) {
+            Ok(val) => val,
+            Err(e) => {
+                anyhow::bail!(
+                    "Failed to decode Gemini response body (Status: {}): {}\n\nRaw response:\n{}",
+                    status,
+                    e,
+                    response_text
+                );
+            }
+        };
 
         if let Some(error) = response_body.get("error") {
             anyhow::bail!("Gemini OAuth API error: {}", error);

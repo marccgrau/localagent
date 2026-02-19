@@ -12,6 +12,17 @@ use anyhow::{Context, Result};
 use libc::getuid;
 use std::path::{Path, PathBuf};
 
+use crate::env::{
+    LOCALGPT_CACHE_DIR, LOCALGPT_CONFIG_DIR, LOCALGPT_DATA_DIR, LOCALGPT_PROFILE,
+    LOCALGPT_STATE_DIR, LOCALGPT_WORKSPACE,
+};
+
+// XDG path constants for documentation and defaults
+pub const DEFAULT_CONFIG_DIR_STR: &str = "~/.config/localgpt";
+pub const DEFAULT_DATA_DIR_STR: &str = "~/.local/share/localgpt";
+pub const DEFAULT_STATE_DIR_STR: &str = "~/.local/state/localgpt";
+pub const DEFAULT_CACHE_DIR_STR: &str = "~/.cache/localgpt";
+
 /// Resolved directory paths for the entire application.
 ///
 /// Created once at startup, threaded through Config.
@@ -55,22 +66,22 @@ impl Paths {
         let strategy = etcetera::choose_base_strategy()
             .map_err(|e| anyhow::anyhow!("Failed to determine base directories: {}", e))?;
 
-        let config_dir = env_or(&env_fn, "LOCALGPT_CONFIG_DIR", || {
+        let config_dir = env_or(&env_fn, LOCALGPT_CONFIG_DIR, || {
             strategy.config_dir().join("localgpt")
         });
 
-        let data_dir = env_or(&env_fn, "LOCALGPT_DATA_DIR", || {
+        let data_dir = env_or(&env_fn, LOCALGPT_DATA_DIR, || {
             strategy.data_dir().join("localgpt")
         });
 
-        let state_dir = env_or(&env_fn, "LOCALGPT_STATE_DIR", || {
+        let state_dir = env_or(&env_fn, LOCALGPT_STATE_DIR, || {
             // etcetera's choose_base_strategy gives XDG paths on all platforms.
             // state_dir() returns data_dir() as fallback on platforms without XDG_STATE_HOME.
             let base_state = strategy.state_dir().unwrap_or_else(|| strategy.data_dir());
             base_state.join("localgpt")
         });
 
-        let cache_dir = env_or(&env_fn, "LOCALGPT_CACHE_DIR", || {
+        let cache_dir = env_or(&env_fn, LOCALGPT_CACHE_DIR, || {
             strategy.cache_dir().join("localgpt")
         });
 
@@ -239,7 +250,7 @@ where
     F: Fn(&str) -> std::result::Result<String, std::env::VarError>,
 {
     // Direct workspace override
-    if let Ok(ws) = env_fn("LOCALGPT_WORKSPACE") {
+    if let Ok(ws) = env_fn(LOCALGPT_WORKSPACE) {
         let trimmed = ws.trim();
         if !trimmed.is_empty() {
             let expanded = shellexpand::tilde(trimmed);
@@ -251,7 +262,7 @@ where
     }
 
     // Profile-based workspace
-    if let Ok(profile) = env_fn("LOCALGPT_PROFILE") {
+    if let Ok(profile) = env_fn(LOCALGPT_PROFILE) {
         let trimmed = profile.trim().to_lowercase();
         if !trimmed.is_empty() && trimmed != "default" {
             return data_dir.join(format!("workspace-{}", trimmed));
@@ -356,10 +367,10 @@ mod tests {
     #[test]
     fn localgpt_env_vars_override_xdg() {
         let mut env: HashMap<&str, &str> = HashMap::new();
-        env.insert("LOCALGPT_CONFIG_DIR", "/custom/config");
-        env.insert("LOCALGPT_DATA_DIR", "/custom/data");
-        env.insert("LOCALGPT_STATE_DIR", "/custom/state");
-        env.insert("LOCALGPT_CACHE_DIR", "/custom/cache");
+        env.insert(LOCALGPT_CONFIG_DIR, "/custom/config");
+        env.insert(LOCALGPT_DATA_DIR, "/custom/data");
+        env.insert(LOCALGPT_STATE_DIR, "/custom/state");
+        env.insert(LOCALGPT_CACHE_DIR, "/custom/cache");
 
         let paths = Paths::resolve_with_env(make_env(env)).unwrap();
         assert_eq!(paths.config_dir, PathBuf::from("/custom/config"));
@@ -371,7 +382,7 @@ mod tests {
     #[test]
     fn relative_paths_are_ignored() {
         let mut env: HashMap<&str, &str> = HashMap::new();
-        env.insert("LOCALGPT_CONFIG_DIR", "relative/path");
+        env.insert(LOCALGPT_CONFIG_DIR, "relative/path");
 
         let paths = Paths::resolve_with_env(make_env(env)).unwrap();
         // Should fall back to XDG default, not use relative path
@@ -382,7 +393,7 @@ mod tests {
     #[test]
     fn workspace_override_independent_of_data_dir() {
         let mut env: HashMap<&str, &str> = HashMap::new();
-        env.insert("LOCALGPT_WORKSPACE", "/projects/my-workspace");
+        env.insert(LOCALGPT_WORKSPACE, "/projects/my-workspace");
 
         let paths = Paths::resolve_with_env(make_env(env)).unwrap();
         assert_eq!(paths.workspace, PathBuf::from("/projects/my-workspace"));
@@ -394,7 +405,7 @@ mod tests {
     #[test]
     fn profile_creates_named_workspace() {
         let mut env: HashMap<&str, &str> = HashMap::new();
-        env.insert("LOCALGPT_PROFILE", "work");
+        env.insert(LOCALGPT_PROFILE, "work");
 
         let paths = Paths::resolve_with_env(make_env(env)).unwrap();
         assert!(
@@ -423,7 +434,7 @@ mod tests {
     #[test]
     fn empty_env_vars_ignored() {
         let mut env: HashMap<&str, &str> = HashMap::new();
-        env.insert("LOCALGPT_CONFIG_DIR", "");
+        env.insert(LOCALGPT_CONFIG_DIR, "");
 
         let paths = Paths::resolve_with_env(make_env(env)).unwrap();
         // Should use XDG default, not empty string

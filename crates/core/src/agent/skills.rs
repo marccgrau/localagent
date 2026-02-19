@@ -98,7 +98,7 @@ fn default_true() -> bool {
 pub enum SkillSource {
     /// Workspace-level skill (highest priority)
     Workspace,
-    /// User-managed skill (~/.localgpt/skills/)
+    /// User-managed skill (~/.local/share/localgpt/skills/)
     Managed,
     /// Bundled with the application
     Bundled,

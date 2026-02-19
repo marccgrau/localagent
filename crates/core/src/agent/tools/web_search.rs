@@ -1285,7 +1285,7 @@ mod tests {
     #[tokio::test]
     #[ignore = "requires a live SearXNG instance"]
     async fn test_searxng_live() {
-        let base_url = std::env::var("LOCALGPT_TEST_SEARXNG_URL")
+        let base_url = std::env::var(crate::env::LOCALGPT_TEST_SEARXNG_URL)
             .unwrap_or_else(|_| "http://localhost:8080".to_string());
         let provider = SearxngProvider::new(SearxngConfig {
             base_url,

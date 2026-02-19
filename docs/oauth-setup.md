@@ -101,16 +101,23 @@ localgpt ask "Hello" --model opus  # alias
    - Click "Create Credentials" → "OAuth client ID"
    - Select application type (Desktop app for CLI, Web app for web apps)
    - Download the `client_id.json` file
+   - **Important:** Set the following environment variables using values from the JSON:
+     ```bash
+     export LOCALGPT_GOOGLE_CLIENT_ID="your-client-id"
+     export LOCALGPT_GOOGLE_CLIENT_SECRET="your-client-secret"
+     ```
 
 4. **Authorization Flow:**
    ```bash
-   # Manual OAuth flow (pseudocode)
+       # Option 1: Use the built-in command (Recommended)
+       localgpt auth gemini --project your-project-id
+      # Option 2: Use gemini-cli
+   gemini auth login --oauth
+   
+   # Option 3: Manual OAuth flow (pseudocode)
    # 1. Redirect user to Google OAuth consent screen
    # 2. User authorizes
    # 3. Exchange authorization code for tokens
-   
-   # Or use gemini-cli:
-   gemini auth login --oauth
    ```
 
 5. **Token Response:**
@@ -124,7 +131,7 @@ localgpt ask "Hello" --model opus  # alias
 
 ### Configuration
 
-Add to `~/.localgpt/config.toml`:
+If you used `localgpt auth gemini`, the configuration below is updated automatically. You can verify or manually add to `~/.localgpt/config.toml`:
 
 ```toml
 [providers.gemini_oauth]
