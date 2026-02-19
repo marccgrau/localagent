@@ -420,12 +420,16 @@ impl Agent {
     }
 
     /// Build the message array for an LLM API call, with the security
-    /// block injected as a trailing user message on every call.
+    /// block concatenated into the last user/tool message on every call.
     ///
     /// This ensures the security suffix always occupies the recency position
     /// (last content before generation), regardless of conversation length.
     /// The security block is synthetic — it is not persisted in session
     /// history and not included in compaction/summarization.
+    ///
+    /// We concatenate into the last message rather than appending a separate
+    /// user message to avoid consecutive same-role messages, which violates
+    /// the Anthropic Messages API protocol.
     fn messages_for_api_call(&self) -> Vec<Message> {
         let mut messages = self.session.messages_for_llm();
 
@@ -438,15 +442,29 @@ impl Agent {
 
         let security_block = crate::security::build_ending_security_block(policy, include_suffix);
 
-        // Only append if the block has content
         if !security_block.is_empty() {
-            messages.push(Message {
-                role: Role::User,
-                content: security_block,
-                tool_calls: None,
-                tool_call_id: None,
-                images: Vec::new(),
-            });
+            // Concatenate into the last User or Tool message to avoid
+            // consecutive same-role messages (Anthropic API requirement).
+            let appended = if let Some(last) = messages.last_mut() {
+                matches!(last.role, Role::User | Role::Tool)
+            } else {
+                false
+            };
+
+            if appended {
+                let last = messages.last_mut().unwrap();
+                last.content.push_str("\n\n");
+                last.content.push_str(&security_block);
+            } else {
+                // Fallback: no messages or last message is Assistant/System
+                messages.push(Message {
+                    role: Role::User,
+                    content: security_block,
+                    tool_calls: None,
+                    tool_call_id: None,
+                    images: Vec::new(),
+                });
+            }
         }
 
         messages

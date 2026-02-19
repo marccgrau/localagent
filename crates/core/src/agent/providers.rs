@@ -1895,46 +1895,25 @@ fn normalize_claude_model(model: &str) -> String {
 }
 
 #[cfg(feature = "claude-cli")]
-/// Check if a message is the synthetic security block appended by `messages_for_api_call`.
-fn is_security_block(msg: &Message) -> bool {
-    msg.role == Role::User
-        && msg
-            .content
-            .contains(crate::security::HARDCODED_SECURITY_SUFFIX)
-}
-
-#[cfg(feature = "claude-cli")]
 fn build_prompt_from_messages(messages: &[Message]) -> String {
-    // Get the last *real* user message as the prompt, skipping the security block
+    // Get the last user message as the prompt.
+    // The security block is now concatenated into it by messages_for_api_call().
     messages
         .iter()
         .rev()
-        .find(|m| m.role == Role::User && !is_security_block(m))
+        .find(|m| m.role == Role::User)
         .map(|m| m.content.clone())
         .unwrap_or_default()
 }
 
 #[cfg(feature = "claude-cli")]
 fn extract_system_prompt(messages: &[Message]) -> Option<String> {
-    let system = messages
+    // The security block is now concatenated into the last user/tool message
+    // by messages_for_api_call(), so no need to fold it here.
+    messages
         .iter()
         .find(|m| m.role == Role::System)
-        .map(|m| m.content.clone());
-
-    // For Claude CLI, fold the security block into the system prompt
-    // since the CLI only accepts a single prompt + system prompt
-    let security = messages
-        .iter()
-        .rev()
-        .find(|m| is_security_block(m))
-        .map(|m| m.content.clone());
-
-    match (system, security) {
-        (Some(sys), Some(sec)) => Some(format!("{}\n\n{}", sys, sec)),
-        (Some(sys), None) => Some(sys),
-        (None, Some(sec)) => Some(sec),
-        (None, None) => None,
-    }
+        .map(|m| m.content.clone())
 }
 
 #[cfg(feature = "claude-cli")]
