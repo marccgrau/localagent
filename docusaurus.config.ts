@@ -70,6 +70,12 @@ const config: Config = {
           'aria-label': 'YouTube Gen Gallery',
         },
         {
+          href: 'https://discord.gg/yMQ8tfxG',
+          position: 'right',
+          className: 'header-discord-link',
+          'aria-label': 'Discord',
+        },
+        {
           href: 'https://x.com/localgpt',
           position: 'right',
           className: 'header-x-link',
@@ -138,6 +144,10 @@ const config: Config = {
             {
               label: 'GitHub',
               href: 'https://github.com/localgpt-app/localgpt',
+            },
+            {
+              label: 'Discord',
+              href: 'https://discord.gg/yMQ8tfxG',
             },
             {
               label: 'X (Twitter)',
