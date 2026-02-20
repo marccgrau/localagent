@@ -106,16 +106,17 @@ cp target/release/localgpt ~/.local/bin/
 
 ## Initial Setup
 
-1. **Create the configuration directory:**
+1. **Create the workspace directory:**
 
 ```bash
-mkdir -p ~/.localgpt/workspace/memory
+mkdir -p ~/.local/share/localgpt/workspace/memory
 ```
 
 2. **Create the configuration file:**
 
 ```bash
-cp config.example.toml ~/.localgpt/config.toml
+mkdir -p ~/.config/localgpt
+cp config.example.toml ~/.config/localgpt/config.toml
 ```
 
 3. **Edit the configuration with your API key:**

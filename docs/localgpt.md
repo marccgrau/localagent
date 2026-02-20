@@ -116,7 +116,7 @@ The resulting text is appended to the last message with a `\n\n` separator. It i
 
 ## Disabling the security block
 
-Both layers can be independently disabled in `~/.localgpt/config.toml`:
+Both layers can be independently disabled in `~/.config/localgpt/config.toml`:
 
 ```toml
 [security]

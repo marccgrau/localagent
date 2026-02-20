@@ -4,7 +4,7 @@ sidebar_position: 14
 
 # Configuration
 
-LocalGPT is configured via a TOML file at `~/.localgpt/config.toml`.
+LocalGPT is configured via a TOML file at `~/.config/localgpt/config.toml`.
 
 ## Quick Start
 
@@ -17,8 +17,8 @@ localgpt config init
 Or create one manually:
 
 ```bash
-mkdir -p ~/.localgpt
-cat > ~/.localgpt/config.toml << 'EOF'
+mkdir -p ~/.config/localgpt
+cat > ~/.config/localgpt/config.toml << 'EOF'
 [agent]
 default_model = "claude-cli/opus"
 EOF
@@ -28,7 +28,7 @@ EOF
 
 ```toml
 # LocalGPT Configuration
-# ~/.localgpt/config.toml
+# ~/.config/localgpt/config.toml
 
 #──────────────────────────────────────────────────────────────────────────────
 # Agent Settings
@@ -132,7 +132,7 @@ active_hours = { start = "09:00", end = "22:00" }
 [memory]
 # Where to store memory files
 # Supports ~ for home directory
-workspace = "~/.localgpt/workspace"
+workspace = "~/.local/share/localgpt/workspace"
 
 # Chunk size for indexing (tokens)
 # Smaller = more precise search, larger = more context
@@ -153,7 +153,7 @@ embedding_provider = "local"
 embedding_model = "BAAI/bge-small-en-v1.5"
 
 # Cache directory for downloaded embedding models
-embedding_cache_dir = "~/.localgpt/cache/embeddings"
+embedding_cache_dir = "~/.cache/localgpt/embeddings"
 
 # Additional paths to index (outside workspace)
 # external_paths = ["~/projects/notes"]
@@ -234,7 +234,7 @@ disable_suffix = false
 level = "info"
 
 # Log file path
-file = "~/.localgpt/logs/agent.log"
+file = "~/.local/state/localgpt/logs/agent.log"
 
 #──────────────────────────────────────────────────────────────────────────────
 # Telegram Bot
@@ -361,7 +361,7 @@ default_model = "gemini/gemini-2.0-flash"  # or gemini-1.5-pro, etc.
 If you run a local server that speaks the OpenAI API (e.g., LM Studio, llamafile, vLLM), point LocalGPT at it with an `openai/*` model ID:
 
 1. Start your local server and note the port and model name.
-2. Edit `~/.localgpt/config.toml`:
+2. Edit `~/.config/localgpt/config.toml`:
 
 ```toml
 [agent]
@@ -412,22 +412,22 @@ export LOCALGPT_WORKSPACE=~/my-project/ai-workspace
 localgpt chat
 
 # Use profile-based workspaces
-export LOCALGPT_PROFILE=work    # uses ~/.localgpt/workspace-work
-export LOCALGPT_PROFILE=home    # uses ~/.localgpt/workspace-home
+export LOCALGPT_PROFILE=work    # uses ~/.local/share/localgpt/workspace-work
+export LOCALGPT_PROFILE=home    # uses ~/.local/share/localgpt/workspace-home
 ```
 
 Resolution order:
 1. `LOCALGPT_WORKSPACE` env var (absolute path override)
-2. `LOCALGPT_PROFILE` env var (creates `~/.localgpt/workspace-{profile}`)
+2. `LOCALGPT_PROFILE` env var (creates `~/.local/share/localgpt/workspace-{profile}`)
 3. `memory.workspace` from config file
-4. Default: `~/.localgpt/workspace`
+4. Default: `~/.local/share/localgpt/workspace`
 
 ## Configuration Precedence
 
 Configuration is loaded in this order (later overrides earlier):
 
 1. Default values
-2. `~/.localgpt/config.toml`
+2. `~/.config/localgpt/config.toml`
 3. Environment variables
 4. Command-line flags (`-m`, `--model`, etc.)
 
@@ -458,11 +458,11 @@ Error: Unknown model: gpt5
 ### Permission Denied
 
 ```
-Error: Cannot write to ~/.localgpt/workspace
+Error: Cannot write to ~/.local/share/localgpt/workspace
 ```
 
 **Solution:** Create the directory with proper permissions:
 ```bash
-mkdir -p ~/.localgpt/workspace
-chmod 700 ~/.localgpt
+mkdir -p ~/.local/share/localgpt/workspace
+chmod 700 ~/.config/localgpt
 ```

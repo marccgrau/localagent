@@ -33,7 +33,7 @@ Commands:
 localgpt [OPTIONS] <COMMAND>
 
 Options:
-  -c, --config <PATH>  Path to config file (default: ~/.localgpt/config.toml)
+  -c, --config <PATH>  Path to config file (default: ~/.config/localgpt/config.toml)
   -a, --agent <ID>     Agent ID (default: "main")
   -m, --model <MODEL>  Override the default model
   -v, --verbose        Enable verbose logging

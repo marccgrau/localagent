@@ -24,20 +24,28 @@ LocalGPT is a **local AI assistant with persistent memory, semantic search, and 
 
 ## Architecture Overview
 
-```
-~/.localgpt/
-├── config.toml                  # Configuration file
-├── .device_key                  # HMAC signing key (0600)
-├── .security_audit.jsonl        # Append-only audit log
+LocalGPT follows the [XDG Base Directory Specification](https://specifications.freedesktop.org/basedir-spec/latest/):
+
+```text
+~/.config/localgpt/
+└── config.toml                  # Configuration file
+
+~/.local/share/localgpt/
 ├── workspace/
 │   ├── MEMORY.md                # Curated long-term knowledge
 │   ├── HEARTBEAT.md             # Pending autonomous tasks
-│   ├── LocalGPT.md              # Standing instructions to the AI
-│   ├── .localgpt_manifest.json  # Policy signature
+│   ├── LocalGPT.md              # Standing instructions
 │   └── memory/
-│       └── YYYY-MM-DD.md        # Daily conversation logs
-└── logs/
-    └── agent.log                # Application logs
+│       └── YYYY-MM-DD.md        # Conversation logs
+└── localgpt.device.key          # HMAC signing key (0600)
+
+~/.local/state/localgpt/
+├── logs/
+│   └── agent.log                # Application logs
+└── localgpt.audit.jsonl         # Append-only audit log
+
+~/.cache/localgpt/
+└── embeddings/                  # Downloaded embedding models
 ```
 
 ## How It Works
