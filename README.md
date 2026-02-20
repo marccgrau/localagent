@@ -304,14 +304,6 @@ When the daemon is running:
 | `GET /api/saved-sessions/{session_id}` | Get persisted session |
 | `GET /api/logs/daemon` | Tail daemon logs |
 
-### Egui Web UI (PoC)
-
-LocalGPT includes a Proof of Concept for running the desktop Egui UI in the browser via WebAssembly. This enables code reuse between desktop and web interfaces.
-
-**Try it**: After building the WASM UI with `./build-egui-web.sh`, visit `http://localhost:31327/egui`
-
-See [`docs/egui-web-poc.md`](docs/egui-web-poc.md) for details on architecture, benefits, tradeoffs, and implementation.
-
 ## <img src="https://localgpt.app/logo/localgpt-icon.png" width="100" height="100" alt="LocalGPT" /> Gen Mode (World Generation)
 
 `Gen` is a separate binary (`localgpt-gen`) in the workspace — not a `localgpt gen` subcommand.

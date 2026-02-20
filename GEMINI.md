@@ -9,7 +9,7 @@ LocalGPT is a local-first, privacy-focused AI assistant built in Rust. It is ins
   - **Language**: Rust (Edition 2024)
   - **Async Runtime**: [Tokio](https://tokio.rs/)
   - **Database**: SQLite with FTS5 (keyword search) and `sqlite-vec` (semantic search)
-  - **UI**: CLI (clap), Desktop/Web (egui/eframe), Telegram (teloxide)
+  - **UI**: CLI (clap), Desktop (egui/eframe), Telegram (teloxide)
   - **Security**: OS-level sandboxing (Landlock on Linux, Seatbelt on macOS)
   - **LLM Providers**: Support for Anthropic, OpenAI, Ollama, xAI, and OAuth-based subscriptions.
 
@@ -65,12 +65,6 @@ cargo fmt --all -- --check
 
 # Run linter
 cargo clippy --workspace -- -D warnings
-```
-
-### Frontend (Egui Web)
-```bash
-# Build the WASM-based web UI
-./build-egui-web.sh
 ```
 
 ## Coding Conventions

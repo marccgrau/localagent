@@ -57,7 +57,7 @@ LocalGPT is a local-only AI assistant with persistent markdown-based memory and 
 crates/
 ├── core/      # localgpt-core — shared library (agent, memory, config, security)
 ├── cli/       # localgpt — binary with clap CLI, desktop GUI, dangerous tools
-├── server/    # localgpt-server — HTTP/WS API, Telegram bot, optional WASM web UI
+├── server/    # localgpt-server — HTTP/WS API, Telegram bot, embedded Web UI
 ├── sandbox/   # localgpt-sandbox — Landlock/Seatbelt process sandboxing
 ├── mobile/    # localgpt-mobile — UniFFI bindings for iOS/Android
 └── gen/       # localgpt-gen — Bevy 3D scene generation binary
@@ -129,7 +129,6 @@ Mobile crate uses `default-features = false, features = ["embeddings-openai"]` �
 
 - **http.rs** — Axum REST API with RustEmbed'd Web UI. Routes: `/health`, `/api/status`, `/api/chat`, `/api/memory/search`, `/api/memory/stats`
 - **telegram.rs** — Telegram bot with 6-digit pairing auth, streaming edits, agent ID `"telegram"`
-- Optional `egui-web` feature for WASM web UI
 
 ### Gen (3D Scene Generation with Audio)
 
