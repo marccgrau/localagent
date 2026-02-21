@@ -27,11 +27,11 @@ const config: Config = {
       {
         docs: {
           sidebarPath: './sidebars.ts',
-          editUrl: 'https://github.com/localgpt-app/localgpt/tree/main/localgpt-app-docusaurus/',
+          editUrl: 'https://github.com/localgpt-app/localgpt/tree/main/website/',
         },
         blog: {
           showReadingTime: true,
-          editUrl: 'https://github.com/localgpt-app/localgpt/tree/main/localgpt-app-docusaurus/',
+          editUrl: 'https://github.com/localgpt-app/localgpt/tree/main/website/',
         },
         theme: {
           customCss: './src/css/custom.css',
