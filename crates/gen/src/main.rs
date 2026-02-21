@@ -7,8 +7,8 @@ use anyhow::Result;
 use clap::Parser;
 use std::path::PathBuf;
 
-mod gen3d;
 mod avatar_tools;
+mod gen3d;
 
 #[derive(Parser)]
 #[command(name = "localgpt-gen")]

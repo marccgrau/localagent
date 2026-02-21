@@ -34,6 +34,8 @@ impl BridgeManager {
     /// Register a new bridge secret.
     /// Encrypts and saves to disk, and updates cache.
     pub async fn register_bridge(&self, bridge_id: &str, secret: &[u8]) -> Result<()> {
+        validate_bridge_id(bridge_id)?;
+
         let paths = Paths::resolve()?;
         let bridges_dir = paths.data_dir.join("bridges");
         std::fs::create_dir_all(&bridges_dir)?;
@@ -84,6 +86,11 @@ impl BridgeManager {
         bridge_id: &str,
         identity: &PeerIdentity,
     ) -> Result<Vec<u8>, BridgeError> {
+        if let Err(e) = validate_bridge_id(bridge_id) {
+            error!("Invalid bridge ID: {}", e);
+            return Err(BridgeError::AuthFailed("Invalid bridge ID".to_string()));
+        }
+
         // Verify identity (Basic check for now)
         // TODO: Implement stricter checks based on OS user or code signature
         info!(
@@ -175,7 +182,23 @@ impl BridgeManager {
             };
 
             let identity = match identity_result {
-                Ok(id) => id,
+                Ok(id) => {
+                    // Enforce UID matching (same-user only)
+                    #[cfg(unix)]
+                    {
+                        let current_uid = unsafe { libc::getuid() };
+                        if let Some(peer_uid) = id.uid {
+                            if peer_uid != current_uid {
+                                error!(
+                                    "Rejected connection from UID {} (expected {})",
+                                    peer_uid, current_uid
+                                );
+                                continue;
+                            }
+                        }
+                    }
+                    id
+                }
                 Err(e) => {
                     error!("Peer identity verification failed: {}", e);
                     continue;
@@ -243,4 +266,20 @@ impl BridgeService for ConnectionHandler {
             .get_credentials_for(&bridge_id, &self.identity)
             .await
     }
+}
+
+fn validate_bridge_id(id: &str) -> Result<()> {
+    if id.is_empty() {
+        anyhow::bail!("Bridge ID cannot be empty");
+    }
+    if id.len() > 64 {
+        anyhow::bail!("Bridge ID is too long (max 64 chars)");
+    }
+    if !id
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+    {
+        anyhow::bail!("Bridge ID contains invalid characters. Allowed: a-z, A-Z, 0-9, -, _");
+    }
+    Ok(())
 }

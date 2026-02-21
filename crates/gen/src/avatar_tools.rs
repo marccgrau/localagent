@@ -3,8 +3,8 @@ use async_trait::async_trait;
 use localgpt_core::agent::providers::ToolSchema;
 use localgpt_core::agent::tools::Tool;
 use serde::Serialize;
-use serde_json::json;
 use serde_json::Value;
+use serde_json::json;
 
 const BASE_URL: &str = "http://127.0.0.1:32123";
 
@@ -26,7 +26,9 @@ impl Tool for GetAvatarStateTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema {
             name: "get_avatar_state".to_string(),
-            description: "Get the current state (position, rotation, etc.) of the connected 3D avatar.".to_string(),
+            description:
+                "Get the current state (position, rotation, etc.) of the connected 3D avatar."
+                    .to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {},
@@ -107,7 +109,7 @@ impl Tool for MoveAvatarTool {
 
     async fn execute(&self, arguments: &str) -> Result<String> {
         let args: Value = serde_json::from_str(arguments)?;
-        
+
         let forward = args["forward"].as_f64().unwrap_or(0.0) as f32;
         let right = args["right"].as_f64().unwrap_or(0.0) as f32;
         let duration_ms = args["duration_ms"].as_u64().unwrap_or(500);
@@ -121,7 +123,8 @@ impl Tool for MoveAvatarTool {
         };
 
         let client = reqwest::Client::new();
-        let res = client.post(format!("{}/command", BASE_URL))
+        let res = client
+            .post(format!("{}/command", BASE_URL))
             .json(&cmd)
             .send()
             .await?
@@ -170,7 +173,7 @@ impl Tool for LookAvatarTool {
 
     async fn execute(&self, arguments: &str) -> Result<String> {
         let args: Value = serde_json::from_str(arguments)?;
-        
+
         let yaw_degrees = args["yaw_degrees"].as_f64().unwrap_or(0.0) as f32;
         let pitch_degrees = args["pitch_degrees"].as_f64().unwrap_or(0.0) as f32;
 
@@ -180,7 +183,8 @@ impl Tool for LookAvatarTool {
         };
 
         let client = reqwest::Client::new();
-        let res = client.post(format!("{}/command", BASE_URL))
+        let res = client
+            .post(format!("{}/command", BASE_URL))
             .json(&cmd)
             .send()
             .await?
@@ -225,15 +229,17 @@ impl Tool for TeleportAvatarTool {
 
     async fn execute(&self, arguments: &str) -> Result<String> {
         let args: Value = serde_json::from_str(arguments)?;
-        
-        let location_id = args["location_id"].as_str().ok_or_else(|| anyhow::anyhow!("Missing location_id"))?.to_string();
 
-        let cmd = ApiCommand::Teleport {
-            location_id,
-        };
+        let location_id = args["location_id"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("Missing location_id"))?
+            .to_string();
+
+        let cmd = ApiCommand::Teleport { location_id };
 
         let client = reqwest::Client::new();
-        let res = client.post(format!("{}/command", BASE_URL))
+        let res = client
+            .post(format!("{}/command", BASE_URL))
             .json(&cmd)
             .send()
             .await?
