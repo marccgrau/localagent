@@ -1,0 +1,9 @@
+# iOS Build Artifacts
+LocalGPTWrapper/LocalGPTCore.xcframework/
+LocalGPTWrapper/Sources/LocalGPTWrapper/localgpt_mobile.swift
+LocalGPTWrapper/Sources/LocalGPTWrapper/include/
+LocalGPTWrapper/.build/
+
+# General
+*.a
+.DS_Store

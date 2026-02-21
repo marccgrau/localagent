@@ -35,7 +35,12 @@ mod unix {
         })
     }
 
-    #[cfg(target_os = "macos")]
+    #[cfg(any(
+        target_os = "macos",
+        target_os = "ios",
+        target_os = "tvos",
+        target_os = "watchos"
+    ))]
     pub fn get_peer_identity<T: AsRawFd>(stream: &T) -> io::Result<PeerIdentity> {
         let fd = stream.as_raw_fd();
         let mut uid: libc::uid_t = 0;

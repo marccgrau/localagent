@@ -26,4 +26,9 @@ target
 .*
 !.gitignore
 !.github/
-\n# Website dependencies\nwebsite/node_modules/
+
+# Compiled libraries
+*.a
+
+# Website dependencies
+website/node_modules/
