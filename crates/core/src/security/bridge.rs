@@ -39,7 +39,7 @@ impl BridgeManager {
         std::fs::create_dir_all(&bridges_dir)?;
 
         // 1. Get Master Key
-        let master_key = read_device_key(&paths.state_dir)?;
+        let master_key = read_device_key(&paths.data_dir)?;
 
         // 2. Derive Bridge Key = HMAC-SHA256(MasterKey, "bridge-key:" + bridge_id)
         let bridge_key = derive_bridge_key(&master_key, bridge_id)?;
@@ -123,7 +123,7 @@ impl BridgeManager {
         let nonce = Nonce::from_slice(nonce_bytes);
 
         // Derive Key
-        let master_key = read_device_key(&paths.state_dir)?;
+        let master_key = read_device_key(&paths.data_dir)?;
         let bridge_key = derive_bridge_key(&master_key, bridge_id)?;
 
         // Decrypt

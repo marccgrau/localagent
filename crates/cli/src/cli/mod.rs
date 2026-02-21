@@ -8,6 +8,7 @@ pub mod daemon;
 pub mod desktop;
 #[cfg(feature = "gen")]
 pub mod gen3d;
+pub mod init;
 pub mod md;
 pub mod memory;
 pub mod paths;
@@ -82,6 +83,9 @@ pub enum Commands {
 
     /// Authenticate with providers (Gemini, etc.)
     Auth(auth::AuthArgs),
+
+    /// Initialize configuration and keys
+    Init(init::InitArgs),
 
     /// Manage bridges and credentials
     Bridge(bridge::BridgeArgs),

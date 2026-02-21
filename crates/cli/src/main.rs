@@ -85,6 +85,7 @@ async fn async_main(cli: Cli) -> Result<()> {
         Commands::Sandbox(args) => crate::cli::sandbox::run(args).await,
         Commands::Search(args) => crate::cli::search::run(args).await,
         Commands::Auth(args) => crate::cli::auth::run(args).await,
+        Commands::Init(args) => crate::cli::init::run(args),
         Commands::Bridge(args) => crate::cli::bridge::run(args).await,
     }
 }
