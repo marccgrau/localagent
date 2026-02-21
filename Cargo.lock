@@ -5650,6 +5650,7 @@ dependencies = [
  "gltf-json",
  "image",
  "localgpt-core",
+ "reqwest 0.13.2",
  "rustyline",
  "serde",
  "serde_json",

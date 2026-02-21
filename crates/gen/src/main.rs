@@ -8,6 +8,7 @@ use clap::Parser;
 use std::path::PathBuf;
 
 mod gen3d;
+mod avatar_tools;
 
 #[derive(Parser)]
 #[command(name = "localgpt-gen")]
@@ -27,6 +28,10 @@ struct Cli {
     /// Load a glTF/GLB scene at startup
     #[arg(short = 's', long)]
     scene: Option<String>,
+
+    /// Control an external app (URL) instead of running local window
+    #[arg(long)]
+    control: Option<String>,
 }
 
 fn main() -> Result<()> {
@@ -45,6 +50,19 @@ fn main() -> Result<()> {
     // Load config early so both Bevy and agent threads can use it
     let config = localgpt_core::config::Config::load()?;
     let workspace = config.workspace_path();
+
+    // If --control is set, run headless bridge mode
+    if let Some(url) = cli.control {
+        tracing::info!("Starting Gen in CONTROL mode (headless) -> {}", url);
+        let rt = tokio::runtime::Builder::new_multi_thread()
+            .enable_all()
+            .build()
+            .expect("Failed to build tokio runtime");
+
+        return rt.block_on(async move {
+            run_headless_control_loop(&url, &cli.agent, cli.prompt, config).await
+        });
+    }
 
     // Resolve initial scene path if provided
     let initial_scene = cli
@@ -111,6 +129,94 @@ fn run_bevy_app(
     gen3d::plugin::setup_gen_app(&mut app, channels, workspace, initial_scene);
 
     app.run();
+
+    Ok(())
+}
+
+/// Run the interactive agent loop in headless control mode.
+async fn run_headless_control_loop(
+    url: &str,
+    agent_id: &str,
+    initial_prompt: Option<String>,
+    config: localgpt_core::config::Config,
+) -> Result<()> {
+    use localgpt_core::agent::Agent;
+    use localgpt_core::agent::tools::create_safe_tools;
+    use localgpt_core::memory::MemoryManager;
+    use rustyline::DefaultEditor;
+    use rustyline::error::ReadlineError;
+    use std::sync::Arc;
+
+    // Set up memory
+    let memory = MemoryManager::new_with_agent(&config.memory, agent_id)?;
+    let memory = Arc::new(memory);
+
+    // Create safe tools + avatar tools pointing to the external URL
+    let mut tools = create_safe_tools(&config, Some(memory.clone()))?;
+    tools.extend(crate::avatar_tools::create_avatar_tools());
+
+    // Create agent with combined tools
+    let mut agent = Agent::new_with_tools(config.clone(), agent_id, memory, tools)?;
+    agent.new_session().await?;
+
+    // Inject instructions for avatar control
+    let instructions = r#"
+You are controlling an avatar in an external 3D application.
+Your goal is to explore the world and execute user commands.
+
+You have access to `avatar_tools` to:
+- Get state (`get_avatar_state`)
+- Move (`move_avatar`)
+- Look (`look_avatar`)
+- Teleport (`teleport_avatar`)
+
+Use `get_avatar_state` frequently to understand your position.
+"#;
+    agent.add_user_message(instructions);
+
+    println!("Connected to external avatar control at {}", url);
+
+    // If initial prompt given, send it
+    if let Some(prompt) = initial_prompt {
+        println!("\n> {}", prompt);
+        let response = agent.chat(&prompt).await?;
+        println!("\nLocalGPT: {}\n", response);
+    }
+
+    // Interactive loop
+    let mut rl = DefaultEditor::new()?;
+    loop {
+        let readline = rl.readline("Avatar> ");
+
+        let input = match readline {
+            Ok(line) => line,
+            Err(ReadlineError::Interrupted) => {
+                println!("^C");
+                continue;
+            }
+            Err(ReadlineError::Eof) => {
+                break; // Ctrl+D
+            }
+            Err(err) => {
+                eprintln!("Error: {:?}", err);
+                break;
+            }
+        };
+
+        let input = input.trim();
+        if input.is_empty() {
+            continue;
+        }
+
+        let _ = rl.add_history_entry(input);
+
+        if input == "/quit" || input == "/exit" || input == "/q" {
+            break;
+        }
+
+        let response = agent.chat(input).await?;
+        println!("\nLocalGPT: {}\n", response);
+    }
 
     Ok(())
 }
