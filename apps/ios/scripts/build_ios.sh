@@ -3,8 +3,8 @@ set -e
 
 # Get the directory where the script is located
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
-# Root of the repo
-ROOT_DIR="$SCRIPT_DIR/../../../../"
+# Root of the repo (one level deeper now: apps/ios/scripts -> apps/ios -> apps -> root)
+ROOT_DIR="$SCRIPT_DIR/../../../"
 
 # Configuration
 CRATE_NAME="localgpt_mobile"
@@ -18,10 +18,10 @@ DEVICE_TARGET="aarch64-apple-ios"
 SIM_TARGET="aarch64-apple-ios-sim"
 
 echo "Building for iOS Device ($DEVICE_TARGET)..."
-cargo build -p localgpt-mobile --lib --target $DEVICE_TARGET $RELEASE_MODE
+cargo build -p localgpt-mobile-ffi --lib --target $DEVICE_TARGET $RELEASE_MODE
 
 echo "Building for iOS Simulator ($SIM_TARGET)..."
-cargo build -p localgpt-mobile --lib --target $SIM_TARGET $RELEASE_MODE
+cargo build -p localgpt-mobile-ffi --lib --target $SIM_TARGET $RELEASE_MODE
 
 # Output directories
 mkdir -p "$IOS_WRAPPER_DIR/Sources/LocalGPTWrapper/include"
@@ -31,13 +31,12 @@ mkdir -p "$IOS_WRAPPER_DIR/Sources/LocalGPTWrapper/Resources"
 echo "Generating UniFFI Bindings..."
 LIBRARY_PATH="$TARGET_DIR/$DEVICE_TARGET/release/$LIB_NAME"
 
-cargo run --bin uniffi-bindgen -p localgpt-mobile -- generate \
+cargo run --bin uniffi-bindgen -p localgpt-mobile-ffi -- generate \
     --library "$LIBRARY_PATH" \
     --language swift \
     --out-dir "$IOS_WRAPPER_DIR/Sources/LocalGPTWrapper"
 
 # Modern UniFFI generates <crate>FFI.h and <crate>FFI.modulemap
-# We'll use those.
 FFI_HEADER="${CRATE_NAME}FFI.h"
 FFI_MODULEMAP="${CRATE_NAME}FFI.modulemap"
 

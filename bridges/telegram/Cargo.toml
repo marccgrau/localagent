@@ -5,8 +5,8 @@ edition = "2024"
 license.workspace = true
 
 [dependencies]
-localgpt-core = { path = "../core" }
-localgpt-bridge = { path = "../bridge" }
+localgpt-core = { path = "../../crates/core" }
+localgpt-bridge = { path = "../../crates/bridge" }
 
 tokio = { workspace = true }
 anyhow = { workspace = true }

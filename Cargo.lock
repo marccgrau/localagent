@@ -5714,7 +5714,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "localgpt-mobile"
+name = "localgpt-mobile-ffi"
 version = "0.3.0"
 dependencies = [
  "anyhow",

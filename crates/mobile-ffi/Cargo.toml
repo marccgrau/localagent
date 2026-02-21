@@ -1,5 +1,5 @@
 [package]
-name = "localgpt-mobile"
+name = "localgpt-mobile-ffi"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

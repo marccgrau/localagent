@@ -19,7 +19,7 @@ rand = "0.8"
 tarpc = { version = "0.37.0", features = ["tokio1", "serde-transport"] }
 
 [dependencies.localgpt-bridge]
-path = "../bridge"
+path = "../../crates/bridge"
 
 [dependencies.localgpt-core]
-path = "../core"
+path = "../../crates/core"
