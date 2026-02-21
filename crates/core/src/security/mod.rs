@@ -9,6 +9,7 @@ mod policy;
 mod protected_files;
 mod signing;
 mod suffix;
+mod bridge;
 
 // The localgpt.rs facade controls the entire public API surface.
 pub use self::localgpt::*;

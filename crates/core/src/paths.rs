@@ -163,6 +163,19 @@ impl Paths {
         self.state_dir.join("telegram_paired_user.json")
     }
 
+    /// Bridge socket name (Full path on Unix, pipe name on Windows)
+    pub fn bridge_socket_name(&self) -> String {
+        #[cfg(unix)]
+        {
+            let dir = self.runtime_dir.as_ref().unwrap_or(&self.state_dir);
+            dir.join("bridge.sock").to_string_lossy().to_string()
+        }
+        #[cfg(windows)]
+        {
+            "localgpt-bridge".to_string()
+        }
+    }
+
     /// Managed skills directory: data_dir/skills
     pub fn managed_skills_dir(&self) -> PathBuf {
         self.data_dir.join("skills")

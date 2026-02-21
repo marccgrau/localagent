@@ -73,6 +73,8 @@ readability = "0.3"
 # Security (HMAC signing, hashing)
 sha2 = "0.10"
 hmac = "0.12"
+localgpt-bridge = { version = "0.1.0", path = "../bridge" }
+tarpc = { version = "0.37.0", features = ["tokio1", "serde-transport"] }
 
 [target.'cfg(target_os = "linux")'.build-dependencies]
 cc = "1"
