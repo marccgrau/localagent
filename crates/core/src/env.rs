@@ -36,5 +36,11 @@ pub const LOCALGPT_GOOGLE_CLIENT_ID: &str = "LOCALGPT_GOOGLE_CLIENT_ID";
 /// Google OAuth Client Secret override
 pub const LOCALGPT_GOOGLE_CLIENT_SECRET: &str = "LOCALGPT_GOOGLE_CLIENT_SECRET";
 
+/// GitHub OAuth Client ID override
+pub const LOCALGPT_GITHUB_CLIENT_ID: &str = "LOCALGPT_GITHUB_CLIENT_ID";
+
+/// GitHub OAuth Client Secret override
+pub const LOCALGPT_GITHUB_CLIENT_SECRET: &str = "LOCALGPT_GITHUB_CLIENT_SECRET";
+
 /// Internal: macOS sandbox profile passing (private)
 pub const _LOCALGPT_SBPL_PROFILE: &str = "_LOCALGPT_SBPL_PROFILE";

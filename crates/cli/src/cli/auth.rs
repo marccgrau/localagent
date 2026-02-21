@@ -9,8 +9,11 @@ use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use url::Url;
 
-use localgpt_core::config::{Config, GeminiOAuthConfig};
-use localgpt_core::env::{LOCALGPT_GOOGLE_CLIENT_ID, LOCALGPT_GOOGLE_CLIENT_SECRET};
+use localgpt_core::config::{Config, GeminiOAuthConfig, GitHubOAuthConfig};
+use localgpt_core::env::{
+    LOCALGPT_GITHUB_CLIENT_ID, LOCALGPT_GITHUB_CLIENT_SECRET, LOCALGPT_GOOGLE_CLIENT_ID,
+    LOCALGPT_GOOGLE_CLIENT_SECRET,
+};
 
 const GEMINI_REDIRECT_URI: &str = "http://localhost:8085/oauth2callback";
 const GEMINI_SCOPES: &[&str] = &[
@@ -18,6 +21,9 @@ const GEMINI_SCOPES: &[&str] = &[
     "https://www.googleapis.com/auth/userinfo.email",
     "https://www.googleapis.com/auth/userinfo.profile",
 ];
+
+const GITHUB_DEVICE_CODE_URL: &str = "https://github.com/login/device/code";
+const GITHUB_ACCESS_TOKEN_URL: &str = "https://github.com/login/oauth/access_token";
 
 #[derive(Args, Debug)]
 pub struct AuthArgs {
@@ -33,19 +39,30 @@ pub enum AuthCommands {
         #[arg(short, long)]
         project: Option<String>,
     },
+    /// Authenticate with GitHub (for Copilot models)
+    Github,
 }
 
 #[derive(Deserialize, Debug)]
 struct TokenResponse {
     access_token: String,
     refresh_token: Option<String>,
-    #[allow(dead_code)]
     expires_in: u64,
+}
+
+#[derive(Deserialize, Debug)]
+struct DeviceCodeResponse {
+    device_code: String,
+    user_code: String,
+    verification_uri: String,
+    expires_in: u64,
+    interval: u64,
 }
 
 pub async fn run(args: AuthArgs) -> Result<()> {
     match args.command {
         AuthCommands::Gemini { project } => run_gemini_auth(project).await,
+        AuthCommands::Github => run_github_auth().await,
     }
 }
 
@@ -99,11 +116,120 @@ async fn run_gemini_auth(project_id: Option<String>) -> Result<()> {
     let tokens = exchange_code(&code, &code_verifier, &client_id, &client_secret).await?;
 
     // 7. Save tokens to config
-    update_config(tokens, project_id).await?;
+    update_config_gemini(tokens, client_id, client_secret, project_id).await?;
 
     println!("Successfully authenticated with Gemini! Tokens saved to config.");
     println!("Default model set to 'gemini/gemini-3-pro-preview'.");
     Ok(())
+}
+
+async fn run_github_auth() -> Result<()> {
+    // 1. Resolve Client ID
+    let client_id = std::env::var(LOCALGPT_GITHUB_CLIENT_ID).map_err(|_| {
+        anyhow::anyhow!(
+            "Missing {} environment variable. Please set it with your GitHub OAuth Client ID.",
+            LOCALGPT_GITHUB_CLIENT_ID
+        )
+    })?;
+    let client_secret = std::env::var(LOCALGPT_GITHUB_CLIENT_SECRET).ok();
+
+    println!("\nAuthenticating with GitHub...");
+    let client = Client::new();
+
+    // 2. Request device code
+    let params = [
+        ("client_id", &client_id),
+        ("scope", &"read:user".to_string()),
+    ];
+
+    let response = client
+        .post(GITHUB_DEVICE_CODE_URL)
+        .header("Accept", "application/json")
+        .form(&params)
+        .send()
+        .await?;
+
+    if !response.status().is_success() {
+        let error_text = response.text().await?;
+        anyhow::bail!("GitHub device code request failed: {}", error_text);
+    }
+
+    let device_code: DeviceCodeResponse = response.json().await?;
+
+    println!("\nPlease visit: {}", device_code.verification_uri);
+    println!("And enter code: {}", device_code.user_code);
+    println!("\nWaiting for authorization...\n");
+
+    // 3. Poll for access token
+    let mut interval = std::time::Duration::from_secs(device_code.interval.max(1));
+    let expires_at =
+        std::time::Instant::now() + std::time::Duration::from_secs(device_code.expires_in);
+
+    while std::time::Instant::now() < expires_at {
+        let mut params = vec![
+            ("client_id", client_id.clone()),
+            ("device_code", device_code.device_code.clone()),
+            (
+                "grant_type",
+                "urn:ietf:params:oauth:grant-type:device_code".to_string(),
+            ),
+        ];
+        if let Some(ref secret) = client_secret {
+            params.push(("client_secret", secret.clone()));
+        }
+
+        let response = client
+            .post(GITHUB_ACCESS_TOKEN_URL)
+            .header("Accept", "application/json")
+            .form(&params)
+            .send()
+            .await?;
+
+        let json: serde_json::Value = response.json().await?;
+
+        if let Some(access_token) = json["access_token"].as_str() {
+            // Success!
+            let refresh_token = json["refresh_token"].as_str().map(|s| s.to_string());
+            let expires_in = json["expires_in"].as_u64();
+
+            update_config_github(
+                access_token,
+                refresh_token,
+                expires_in,
+                client_id,
+                client_secret,
+            )
+            .await?;
+
+            println!("Successfully authenticated with GitHub! Tokens saved to config.");
+            println!("Default model set to 'github/copilot'.");
+            return Ok(());
+        }
+
+        if let Some(error) = json["error"].as_str() {
+            match error {
+                "authorization_pending" => {
+                    // Still waiting
+                }
+                "slow_down" => {
+                    interval += std::time::Duration::from_secs(5);
+                }
+                "expired_token" => {
+                    anyhow::bail!("GitHub device code expired. Please run auth again.");
+                }
+                "access_denied" => {
+                    anyhow::bail!("GitHub login cancelled.");
+                }
+                _ => {
+                    anyhow::bail!("GitHub OAuth error: {}", error);
+                }
+            }
+        }
+
+        tokio::time::sleep(interval).await;
+    }
+
+    anyhow::bail!("GitHub device code expired. Please run auth again.")
 }
 
 fn generate_random_string(len: usize) -> String {
@@ -216,25 +342,66 @@ async fn exchange_code(
     Ok(tokens)
 }
 
-async fn update_config(tokens: TokenResponse, project_id: Option<String>) -> Result<()> {
-    // Load existing config
+async fn update_config_github(
+    access_token: &str,
+    refresh_token: Option<String>,
+    expires_in: Option<u64>,
+    client_id: String,
+    client_secret: Option<String>,
+) -> Result<()> {
     let mut config = Config::load().unwrap_or_else(|_| Config::default());
 
-    // Update Gemini OAuth config
+    let expires_at = expires_in.map(|ei| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            + ei
+    });
+
+    config.providers.github_copilot = Some(GitHubOAuthConfig {
+        access_token: access_token.to_string(),
+        refresh_token,
+        client_id: Some(client_id),
+        client_secret,
+        expires_at,
+    });
+
+    config.agent.default_model = "github/copilot".to_string();
+
+    config.save()?;
+    Ok(())
+}
+
+async fn update_config_gemini(
+    tokens: TokenResponse,
+    client_id: String,
+    client_secret: String,
+    project_id: Option<String>,
+) -> Result<()> {
+    let mut config = Config::load().unwrap_or_else(|_| Config::default());
+
+    let expires_at = Some(
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs()
+            + tokens.expires_in,
+    );
+
     let gemini_config = GeminiOAuthConfig {
         access_token: tokens.access_token,
         refresh_token: tokens.refresh_token,
+        client_id: Some(client_id),
+        client_secret: Some(client_secret),
+        expires_at,
         base_url: "https://generativelanguage.googleapis.com".to_string(),
         project_id,
     };
 
     config.providers.gemini_oauth = Some(gemini_config);
-
-    // Set default model to Gemini 3 Pro Preview
     config.agent.default_model = "gemini/gemini-3-pro-preview".to_string();
 
-    // Save config
     config.save()?;
-
     Ok(())
 }

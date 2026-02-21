@@ -333,6 +333,31 @@ pub struct ProvidersConfig {
 
     #[serde(default)]
     pub openai_oauth: Option<OpenAIOAuthConfig>,
+
+    #[serde(default)]
+    pub github_copilot: Option<GitHubOAuthConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GitHubOAuthConfig {
+    /// OAuth access token (Bearer token)
+    pub access_token: String,
+
+    /// OAuth refresh token (optional, not used by GitHub device flow)
+    #[serde(default)]
+    pub refresh_token: Option<String>,
+
+    /// OAuth client ID (optional, for token refresh)
+    #[serde(default)]
+    pub client_id: Option<String>,
+
+    /// OAuth client secret (optional, for token refresh)
+    #[serde(default)]
+    pub client_secret: Option<String>,
+
+    /// Token expiration timestamp in seconds (optional)
+    #[serde(default)]
+    pub expires_at: Option<u64>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -394,6 +419,18 @@ pub struct AnthropicOAuthConfig {
     #[serde(default)]
     pub refresh_token: Option<String>,
 
+    /// OAuth client ID (optional, for token refresh)
+    #[serde(default)]
+    pub client_id: Option<String>,
+
+    /// OAuth client secret (optional, for token refresh)
+    #[serde(default)]
+    pub client_secret: Option<String>,
+
+    /// Token expiration timestamp in seconds (optional)
+    #[serde(default)]
+    pub expires_at: Option<u64>,
+
     #[serde(default = "default_anthropic_base_url")]
     pub base_url: String,
 }
@@ -406,6 +443,18 @@ pub struct GeminiOAuthConfig {
     /// OAuth refresh token (for token renewal)
     #[serde(default)]
     pub refresh_token: Option<String>,
+
+    /// OAuth client ID (optional, for token refresh)
+    #[serde(default)]
+    pub client_id: Option<String>,
+
+    /// OAuth client secret (optional, for token refresh)
+    #[serde(default)]
+    pub client_secret: Option<String>,
+
+    /// Token expiration timestamp in seconds (optional)
+    #[serde(default)]
+    pub expires_at: Option<u64>,
 
     #[serde(default = "default_gemini_base_url")]
     pub base_url: String,
@@ -423,6 +472,18 @@ pub struct OpenAIOAuthConfig {
     /// OAuth refresh token (for token renewal)
     #[serde(default)]
     pub refresh_token: Option<String>,
+
+    /// OAuth client ID (optional, for token refresh)
+    #[serde(default)]
+    pub client_id: Option<String>,
+
+    /// OAuth client secret (optional, for token refresh)
+    #[serde(default)]
+    pub client_secret: Option<String>,
+
+    /// Token expiration timestamp in seconds (optional)
+    #[serde(default)]
+    pub expires_at: Option<u64>,
 
     #[serde(default = "default_openai_base_url")]
     pub base_url: String,
@@ -869,10 +930,40 @@ impl Config {
         {
             perplexity.api_key = expand_env(&perplexity.api_key);
         }
-        if let Some(ref mut openai_oauth) = self.providers.openai_oauth {
-            openai_oauth.access_token = expand_env(&openai_oauth.access_token);
-            if let Some(ref mut refresh) = openai_oauth.refresh_token {
+        if let Some(ref mut anthropic_oauth) = self.providers.anthropic_oauth {
+            anthropic_oauth.access_token = expand_env(&anthropic_oauth.access_token);
+            if let Some(ref mut refresh) = anthropic_oauth.refresh_token {
                 *refresh = expand_env(refresh);
+            }
+            if let Some(ref mut client_id) = anthropic_oauth.client_id {
+                *client_id = expand_env(client_id);
+            }
+            if let Some(ref mut client_secret) = anthropic_oauth.client_secret {
+                *client_secret = expand_env(client_secret);
+            }
+        }
+        if let Some(ref mut gemini_oauth) = self.providers.gemini_oauth {
+            gemini_oauth.access_token = expand_env(&gemini_oauth.access_token);
+            if let Some(ref mut refresh) = gemini_oauth.refresh_token {
+                *refresh = expand_env(refresh);
+            }
+            if let Some(ref mut client_id) = gemini_oauth.client_id {
+                *client_id = expand_env(client_id);
+            }
+            if let Some(ref mut client_secret) = gemini_oauth.client_secret {
+                *client_secret = expand_env(client_secret);
+            }
+        }
+        if let Some(ref mut github) = self.providers.github_copilot {
+            github.access_token = expand_env(&github.access_token);
+            if let Some(ref mut refresh) = github.refresh_token {
+                *refresh = expand_env(refresh);
+            }
+            if let Some(ref mut client_id) = github.client_id {
+                *client_id = expand_env(client_id);
+            }
+            if let Some(ref mut client_secret) = github.client_secret {
+                *client_secret = expand_env(client_secret);
             }
         }
     }
@@ -924,6 +1015,88 @@ impl Config {
     /// 4. Default: data_dir/workspace
     pub fn workspace_path(&self) -> PathBuf {
         self.paths.workspace.clone()
+    }
+
+    /// Update OAuth tokens for a provider and save config
+    pub fn update_oauth_token(
+        &mut self,
+        provider: &str,
+        access_token: String,
+        refresh_token: Option<String>,
+        expires_at: Option<u64>,
+    ) -> Result<()> {
+        let mut changed = false;
+
+        match provider {
+            "gemini" => {
+                if let Some(ref mut oauth) = self.providers.gemini_oauth {
+                    if oauth.access_token != access_token
+                        || oauth.refresh_token != refresh_token
+                        || oauth.expires_at != expires_at
+                    {
+                        oauth.access_token = access_token;
+                        if refresh_token.is_some() {
+                            oauth.refresh_token = refresh_token;
+                        }
+                        oauth.expires_at = expires_at;
+                        changed = true;
+                    }
+                }
+            }
+            "anthropic" => {
+                if let Some(ref mut oauth) = self.providers.anthropic_oauth {
+                    if oauth.access_token != access_token
+                        || oauth.refresh_token != refresh_token
+                        || oauth.expires_at != expires_at
+                    {
+                        oauth.access_token = access_token;
+                        if refresh_token.is_some() {
+                            oauth.refresh_token = refresh_token;
+                        }
+                        oauth.expires_at = expires_at;
+                        changed = true;
+                    }
+                }
+            }
+            "openai" => {
+                if let Some(ref mut oauth) = self.providers.openai_oauth {
+                    if oauth.access_token != access_token
+                        || oauth.refresh_token != refresh_token
+                        || oauth.expires_at != expires_at
+                    {
+                        oauth.access_token = access_token;
+                        if refresh_token.is_some() {
+                            oauth.refresh_token = refresh_token;
+                        }
+                        oauth.expires_at = expires_at;
+                        changed = true;
+                    }
+                }
+            }
+            "github" => {
+                if let Some(ref mut oauth) = self.providers.github_copilot {
+                    if oauth.access_token != access_token
+                        || oauth.refresh_token != refresh_token
+                        || oauth.expires_at != expires_at
+                    {
+                        oauth.access_token = access_token;
+                        if refresh_token.is_some() {
+                            oauth.refresh_token = refresh_token;
+                        }
+                        oauth.expires_at = expires_at;
+                        changed = true;
+                    }
+                }
+            }
+            _ => {}
+        }
+
+        if changed {
+            self.save()?;
+            debug!("Persisted refreshed OAuth tokens for {}", provider);
+        }
+
+        Ok(())
     }
 }
 

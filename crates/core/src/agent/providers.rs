@@ -150,10 +150,24 @@ pub enum StreamEvent {
 
 pub type StreamResult = Pin<Box<dyn Stream<Item = Result<StreamChunk>> + Send>>;
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OAuthTokenUpdate {
+    pub provider: String,
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub expires_at: Option<u64>,
+}
+
 #[async_trait]
 pub trait LLMProvider: Send + Sync {
     /// Get provider name
     fn name(&self) -> String;
+
+    /// Whether the provider has refreshed its credentials and needs the caller
+    /// to persist the updated token to disk.
+    fn token_update(&self) -> Option<OAuthTokenUpdate> {
+        None
+    }
 
     async fn chat(&self, messages: &[Message], tools: Option<&[ToolSchema]>)
     -> Result<LLMResponse>;
@@ -275,6 +289,10 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
                 let full_model = normalize_model_id("anthropic", &model_id);
                 Ok(Box::new(AnthropicOAuthProvider::new(
                     &oauth_config.access_token,
+                    oauth_config.refresh_token.clone(),
+                    oauth_config.client_id.clone(),
+                    oauth_config.client_secret.clone(),
+                    oauth_config.expires_at,
                     &oauth_config.base_url,
                     &full_model,
                     config.agent.max_tokens,
@@ -308,6 +326,10 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             if let Some(oauth_config) = &config.providers.openai_oauth {
                 Ok(Box::new(OpenAIOAuthProvider::new(
                     &oauth_config.access_token,
+                    oauth_config.refresh_token.clone(),
+                    oauth_config.client_id.clone(),
+                    oauth_config.client_secret.clone(),
+                    oauth_config.expires_at,
                     &oauth_config.base_url,
                     &model_id,
                 )?))
@@ -417,9 +439,31 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
 
             Ok(Box::new(GeminiOAuthProvider::new(
                 &gemini_config.access_token,
+                gemini_config.refresh_token.clone(),
+                gemini_config.client_id.clone(),
+                gemini_config.client_secret.clone(),
+                gemini_config.expires_at,
                 &gemini_config.base_url,
                 &model_id,
                 gemini_config.project_id.as_deref(),
+            )?))
+        }
+
+        "github" => {
+            let github_config = config.providers.github_copilot.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "GitHub Copilot provider not configured.\n\
+                    Run `localgpt auth github` to authenticate.",
+                )
+            })?;
+
+            Ok(Box::new(GitHubCopilotProvider::new(
+                &github_config.access_token,
+                github_config.refresh_token.clone(),
+                github_config.client_id.clone(),
+                github_config.client_secret.clone(),
+                github_config.expires_at.unwrap_or(0),
+                &model_id,
             )?))
         }
 
@@ -2488,21 +2532,127 @@ mod tests {
 // Anthropic OAuth Provider (for Claude Pro/Max subscription plans)
 pub struct AnthropicOAuthProvider {
     client: Client,
-    access_token: String,
+    access_token: std::sync::Arc<std::sync::RwLock<String>>,
+    refresh_token: Option<String>,
+    client_id: Option<String>,
+    client_secret: Option<String>,
+    expires_at: std::sync::Arc<std::sync::RwLock<Option<u64>>>,
     base_url: String,
     model: String,
     max_tokens: usize,
 }
 
 impl AnthropicOAuthProvider {
-    pub fn new(access_token: &str, base_url: &str, model: &str, max_tokens: usize) -> Result<Self> {
+    pub fn new(
+        access_token: &str,
+        refresh_token: Option<String>,
+        client_id: Option<String>,
+        client_secret: Option<String>,
+        expires_at: Option<u64>,
+        base_url: &str,
+        model: &str,
+        max_tokens: usize,
+    ) -> Result<Self> {
         Ok(Self {
             client: Client::new(),
-            access_token: access_token.to_string(),
+            access_token: std::sync::Arc::new(std::sync::RwLock::new(access_token.to_string())),
+            refresh_token,
+            client_id,
+            client_secret,
+            expires_at: std::sync::Arc::new(std::sync::RwLock::new(expires_at)),
             base_url: base_url.to_string(),
             model: model.to_string(),
             max_tokens,
         })
+    }
+
+    async fn refresh_access_token(&self) -> Result<()> {
+        let refresh_token = self
+            .refresh_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No refresh token available"))?;
+        let client_id = self
+            .client_id
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No client ID available"))?;
+        let client_secret = self
+            .client_secret
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No client secret available"))?;
+
+        debug!("Refreshing Anthropic OAuth access token...");
+
+        let params = [
+            ("client_id", client_id.as_str()),
+            ("client_secret", client_secret.as_str()),
+            ("refresh_token", refresh_token.as_str()),
+            ("grant_type", "refresh_token"),
+        ];
+
+        let response = self
+            .client
+            .post(format!("{}/oauth/token", self.base_url))
+            .form(&params)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            anyhow::bail!("Failed to refresh Anthropic access token: {}", error_text);
+        }
+
+        let json: Value = response.json().await?;
+        let new_access_token = json["access_token"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("No access_token in refresh response"))?;
+        let expires_in = json["expires_in"].as_u64().unwrap_or(3600);
+
+        {
+            let mut token_guard = self
+                .access_token
+                .write()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire write lock on access_token"))?;
+            *token_guard = new_access_token.to_string();
+        }
+
+        {
+            let mut expires_guard = self
+                .expires_at
+                .write()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire write lock on expires_at"))?;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            *expires_guard = Some(now + expires_in);
+        }
+
+        info!("Anthropic OAuth access token refreshed successfully");
+        Ok(())
+    }
+
+    async fn ensure_valid_token(&self) -> Result<()> {
+        let should_refresh = {
+            let expires_at = self
+                .expires_at
+                .read()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on expires_at"))?;
+            if let Some(expiry) = *expires_at {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                now + 300 >= expiry
+            } else {
+                false
+            }
+        };
+
+        if should_refresh && self.refresh_token.is_some() {
+            self.refresh_access_token().await?;
+        }
+
+        Ok(())
     }
 
     fn format_tools(&self, tools: &[ToolSchema]) -> Vec<Value> {
@@ -2603,6 +2753,17 @@ impl LLMProvider for AnthropicOAuthProvider {
         "anthropic-oauth".to_string()
     }
 
+    fn token_update(&self) -> Option<OAuthTokenUpdate> {
+        let access_token = self.access_token.read().ok()?.clone();
+        let expires_at = *self.expires_at.read().ok()?;
+        Some(OAuthTokenUpdate {
+            provider: "anthropic".to_string(),
+            access_token,
+            refresh_token: self.refresh_token.clone(),
+            expires_at,
+        })
+    }
+
     fn supports_native_search(&self) -> bool {
         true
     }
@@ -2619,6 +2780,8 @@ impl LLMProvider for AnthropicOAuthProvider {
         messages: &[Message],
         tools: Option<&[ToolSchema]>,
     ) -> Result<LLMResponse> {
+        self.ensure_valid_token().await?;
+
         let (system_prompt, formatted_messages) = self.format_messages(messages);
 
         let mut body = json!({
@@ -2650,15 +2813,47 @@ impl LLMProvider for AnthropicOAuthProvider {
             serde_json::to_string_pretty(&body)?
         );
 
+        let current_access_token = self
+            .access_token
+            .read()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on access_token"))?
+            .clone();
         let response = self
             .client
             .post(format!("{}/v1/messages", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.access_token))
+            .header("Authorization", format!("Bearer {}", current_access_token))
             .header("anthropic-version", "2023-06-01")
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .await?;
+
+        let mut status = response.status();
+        let response =
+            if status == reqwest::StatusCode::UNAUTHORIZED && self.refresh_token.is_some() {
+                debug!("Anthropic OAuth returned 401 Unauthorized, attempting to refresh token...");
+                self.refresh_access_token().await?;
+                let new_access_token = self
+                    .access_token
+                    .read()
+                    .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on access_token"))?
+                    .clone();
+
+                let retry_response = self
+                    .client
+                    .post(format!("{}/v1/messages", self.base_url))
+                    .header("Authorization", format!("Bearer {}", new_access_token))
+                    .header("anthropic-version", "2023-06-01")
+                    .header("Content-Type", "application/json")
+                    .json(&body)
+                    .send()
+                    .await?;
+
+                status = retry_response.status();
+                retry_response
+            } else {
+                response
+            };
 
         let response_body: Value = response.json().await?;
         debug!(
@@ -2731,7 +2926,11 @@ impl LLMProvider for AnthropicOAuthProvider {
 // Gemini OAuth Provider (for Google AI subscription plans)
 pub struct GeminiOAuthProvider {
     client: Client,
-    access_token: String,
+    access_token: std::sync::Arc<std::sync::RwLock<String>>,
+    refresh_token: Option<String>,
+    client_id: Option<String>,
+    client_secret: Option<String>,
+    expires_at: std::sync::Arc<std::sync::RwLock<Option<u64>>>,
     base_url: String,
     model: String,
     project_id: Option<String>,
@@ -2740,6 +2939,10 @@ pub struct GeminiOAuthProvider {
 impl GeminiOAuthProvider {
     pub fn new(
         access_token: &str,
+        refresh_token: Option<String>,
+        client_id: Option<String>,
+        client_secret: Option<String>,
+        expires_at: Option<u64>,
         base_url: &str,
         model: &str,
         project_id: Option<&str>,
@@ -2751,11 +2954,105 @@ impl GeminiOAuthProvider {
 
         Ok(Self {
             client,
-            access_token: access_token.to_string(),
+            access_token: std::sync::Arc::new(std::sync::RwLock::new(access_token.to_string())),
+            refresh_token,
+            client_id,
+            client_secret,
+            expires_at: std::sync::Arc::new(std::sync::RwLock::new(expires_at)),
             base_url: base_url.to_string(),
             model: model.to_string(),
             project_id: project_id.map(|s| s.to_string()),
         })
+    }
+
+    async fn refresh_access_token(&self) -> Result<()> {
+        let refresh_token = self
+            .refresh_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No refresh token available"))?;
+        let client_id = self
+            .client_id
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No client ID available"))?;
+        let client_secret = self
+            .client_secret
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No client secret available"))?;
+
+        debug!("Refreshing Gemini OAuth access token...");
+
+        let params = [
+            ("client_id", client_id.as_str()),
+            ("client_secret", client_secret.as_str()),
+            ("refresh_token", refresh_token.as_str()),
+            ("grant_type", "refresh_token"),
+        ];
+
+        let response = self
+            .client
+            .post("https://oauth2.googleapis.com/token")
+            .form(&params)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            anyhow::bail!("Failed to refresh Gemini access token: {}", error_text);
+        }
+
+        let json: Value = response.json().await?;
+        let new_access_token = json["access_token"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("No access_token in refresh response"))?;
+        let expires_in = json["expires_in"].as_u64().unwrap_or(3600);
+
+        {
+            let mut token_guard = self
+                .access_token
+                .write()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire write lock on access_token"))?;
+            *token_guard = new_access_token.to_string();
+        }
+
+        {
+            let mut expires_guard = self
+                .expires_at
+                .write()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire write lock on expires_at"))?;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            *expires_guard = Some(now + expires_in);
+        }
+
+        info!("Gemini OAuth access token refreshed successfully");
+        Ok(())
+    }
+
+    async fn ensure_valid_token(&self) -> Result<()> {
+        let should_refresh = {
+            let expires_at = self
+                .expires_at
+                .read()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on expires_at"))?;
+            if let Some(expiry) = *expires_at {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                // Refresh if token expires in less than 5 minutes
+                now + 300 >= expiry
+            } else {
+                false
+            }
+        };
+
+        if should_refresh && self.refresh_token.is_some() {
+            self.refresh_access_token().await?;
+        }
+
+        Ok(())
     }
 
     fn format_messages(&self, messages: &[Message]) -> Vec<Value> {
@@ -2862,11 +3159,24 @@ impl LLMProvider for GeminiOAuthProvider {
         "gemini-oauth".to_string()
     }
 
+    fn token_update(&self) -> Option<OAuthTokenUpdate> {
+        let access_token = self.access_token.read().ok()?.clone();
+        let expires_at = *self.expires_at.read().ok()?;
+        Some(OAuthTokenUpdate {
+            provider: "gemini".to_string(),
+            access_token,
+            refresh_token: self.refresh_token.clone(),
+            expires_at,
+        })
+    }
+
     async fn chat(
         &self,
         messages: &[Message],
         tools: Option<&[ToolSchema]>,
     ) -> Result<LLMResponse> {
+        self.ensure_valid_token().await?;
+
         let formatted_messages = self.format_messages(messages);
 
         let mut body = json!({
@@ -2897,16 +3207,48 @@ impl LLMProvider for GeminiOAuthProvider {
             )
         };
 
+        let current_access_token = self
+            .access_token
+            .read()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on access_token"))?
+            .clone();
         let response = self
             .client
             .post(&url)
-            .header("Authorization", format!("Bearer {}", self.access_token))
+            .header("Authorization", format!("Bearer {}", current_access_token))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .await?;
 
-        let status = response.status();
+        let mut status = response.status();
+
+        // Handle 401 Unauthorized - try to refresh and retry once
+        let response =
+            if status == reqwest::StatusCode::UNAUTHORIZED && self.refresh_token.is_some() {
+                debug!("Gemini OAuth returned 401 Unauthorized, attempting to refresh token...");
+                self.refresh_access_token().await?;
+                let new_access_token = self
+                    .access_token
+                    .read()
+                    .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on access_token"))?
+                    .clone();
+
+                let retry_response = self
+                    .client
+                    .post(&url)
+                    .header("Authorization", format!("Bearer {}", new_access_token))
+                    .header("Content-Type", "application/json")
+                    .json(&body)
+                    .send()
+                    .await?;
+
+                status = retry_response.status();
+                retry_response
+            } else {
+                response
+            };
+
         let response_text = response.text().await?;
         debug!("Gemini OAuth response ({}): {}", status, response_text);
 
@@ -2993,19 +3335,124 @@ impl LLMProvider for GeminiOAuthProvider {
 // OpenAI OAuth Provider (for ChatGPT Plus/Pro/Team subscription plans)
 pub struct OpenAIOAuthProvider {
     client: Client,
-    access_token: String,
+    access_token: std::sync::Arc<std::sync::RwLock<String>>,
+    refresh_token: Option<String>,
+    client_id: Option<String>,
+    client_secret: Option<String>,
+    expires_at: std::sync::Arc<std::sync::RwLock<Option<u64>>>,
     base_url: String,
     model: String,
 }
 
 impl OpenAIOAuthProvider {
-    pub fn new(access_token: &str, base_url: &str, model: &str) -> Result<Self> {
+    pub fn new(
+        access_token: &str,
+        refresh_token: Option<String>,
+        client_id: Option<String>,
+        client_secret: Option<String>,
+        expires_at: Option<u64>,
+        base_url: &str,
+        model: &str,
+    ) -> Result<Self> {
         Ok(Self {
             client: Client::new(),
-            access_token: access_token.to_string(),
+            access_token: std::sync::Arc::new(std::sync::RwLock::new(access_token.to_string())),
+            refresh_token,
+            client_id,
+            client_secret,
+            expires_at: std::sync::Arc::new(std::sync::RwLock::new(expires_at)),
             base_url: base_url.to_string(),
             model: model.to_string(),
         })
+    }
+
+    async fn refresh_access_token(&self) -> Result<()> {
+        let refresh_token = self
+            .refresh_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No refresh token available"))?;
+        let client_id = self
+            .client_id
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No client ID available"))?;
+        let client_secret = self
+            .client_secret
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No client secret available"))?;
+
+        debug!("Refreshing OpenAI OAuth access token...");
+
+        let params = [
+            ("client_id", client_id.as_str()),
+            ("client_secret", client_secret.as_str()),
+            ("refresh_token", refresh_token.as_str()),
+            ("grant_type", "refresh_token"),
+        ];
+
+        let response = self
+            .client
+            .post(format!("{}/oauth/token", self.base_url))
+            .form(&params)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            anyhow::bail!("Failed to refresh OpenAI access token: {}", error_text);
+        }
+
+        let json: Value = response.json().await?;
+        let new_access_token = json["access_token"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("No access_token in refresh response"))?;
+        let expires_in = json["expires_in"].as_u64().unwrap_or(3600);
+
+        {
+            let mut token_guard = self
+                .access_token
+                .write()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire write lock on access_token"))?;
+            *token_guard = new_access_token.to_string();
+        }
+
+        {
+            let mut expires_guard = self
+                .expires_at
+                .write()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire write lock on expires_at"))?;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            *expires_guard = Some(now + expires_in);
+        }
+
+        info!("OpenAI OAuth access token refreshed successfully");
+        Ok(())
+    }
+
+    async fn ensure_valid_token(&self) -> Result<()> {
+        let should_refresh = {
+            let expires_at = self
+                .expires_at
+                .read()
+                .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on expires_at"))?;
+            if let Some(expiry) = *expires_at {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                now + 300 >= expiry
+            } else {
+                false
+            }
+        };
+
+        if should_refresh && self.refresh_token.is_some() {
+            self.refresh_access_token().await?;
+        }
+
+        Ok(())
     }
 
     fn format_tools(&self, tools: &[ToolSchema]) -> Vec<Value> {
@@ -3101,11 +3548,24 @@ impl LLMProvider for OpenAIOAuthProvider {
         "openai-oauth".to_string()
     }
 
+    fn token_update(&self) -> Option<OAuthTokenUpdate> {
+        let access_token = self.access_token.read().ok()?.clone();
+        let expires_at = *self.expires_at.read().ok()?;
+        Some(OAuthTokenUpdate {
+            provider: "openai".to_string(),
+            access_token,
+            refresh_token: self.refresh_token.clone(),
+            expires_at,
+        })
+    }
+
     async fn chat(
         &self,
         messages: &[Message],
         tools: Option<&[ToolSchema]>,
     ) -> Result<LLMResponse> {
+        self.ensure_valid_token().await?;
+
         let mut body = json!({
             "model": self.model,
             "messages": self.format_messages(messages)
@@ -3122,14 +3582,45 @@ impl LLMProvider for OpenAIOAuthProvider {
             serde_json::to_string_pretty(&body)?
         );
 
+        let current_access_token = self
+            .access_token
+            .read()
+            .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on access_token"))?
+            .clone();
         let response = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.access_token))
+            .header("Authorization", format!("Bearer {}", current_access_token))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .await?;
+
+        let mut status = response.status();
+        let response =
+            if status == reqwest::StatusCode::UNAUTHORIZED && self.refresh_token.is_some() {
+                debug!("OpenAI OAuth returned 401 Unauthorized, attempting to refresh token...");
+                self.refresh_access_token().await?;
+                let new_access_token = self
+                    .access_token
+                    .read()
+                    .map_err(|_| anyhow::anyhow!("Failed to acquire read lock on access_token"))?
+                    .clone();
+
+                let retry_response = self
+                    .client
+                    .post(format!("{}/chat/completions", self.base_url))
+                    .header("Authorization", format!("Bearer {}", new_access_token))
+                    .header("Content-Type", "application/json")
+                    .json(&body)
+                    .send()
+                    .await?;
+
+                status = retry_response.status();
+                retry_response
+            } else {
+                response
+            };
 
         let response_body: Value = response.json().await?;
         debug!(
@@ -3202,5 +3693,284 @@ impl LLMProvider for OpenAIOAuthProvider {
             LLMResponseContent::Text(summary) => Ok(summary),
             _ => anyhow::bail!("Unexpected response type"),
         }
+    }
+}
+
+// GitHub Copilot Provider
+pub struct GitHubCopilotProvider {
+    client: Client,
+    github_token: std::sync::Arc<std::sync::RwLock<String>>,
+    github_refresh_token: Option<String>,
+    github_client_id: Option<String>,
+    github_client_secret: Option<String>,
+    github_expires_at: std::sync::Arc<std::sync::RwLock<Option<u64>>>,
+    copilot_token: std::sync::Arc<std::sync::RwLock<Option<String>>>,
+    copilot_expires_at: std::sync::Arc<std::sync::RwLock<u64>>,
+    base_url: std::sync::Arc<std::sync::RwLock<String>>,
+    model: String,
+}
+
+impl GitHubCopilotProvider {
+    pub fn new(
+        github_token: &str,
+        github_refresh_token: Option<String>,
+        github_client_id: Option<String>,
+        github_client_secret: Option<String>,
+        github_expires_at: Option<u64>,
+        model: &str,
+    ) -> Result<Self> {
+        Ok(Self {
+            client: Client::new(),
+            github_token: std::sync::Arc::new(std::sync::RwLock::new(github_token.to_string())),
+            github_refresh_token,
+            github_client_id,
+            github_client_secret,
+            github_expires_at: std::sync::Arc::new(std::sync::RwLock::new(github_expires_at)),
+            copilot_token: std::sync::Arc::new(std::sync::RwLock::new(None)),
+            copilot_expires_at: std::sync::Arc::new(std::sync::RwLock::new(0)),
+            base_url: std::sync::Arc::new(std::sync::RwLock::new(
+                "https://api.individual.githubcopilot.com".to_string(),
+            )),
+            model: model.to_string(),
+        })
+    }
+
+    async fn refresh_github_token(&self) -> Result<()> {
+        let refresh_token = self
+            .github_refresh_token
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No refresh token available"))?;
+        let client_id = self
+            .github_client_id
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No client ID available"))?;
+
+        debug!("Refreshing GitHub OAuth access token...");
+
+        let mut params = vec![
+            ("client_id", client_id.as_str()),
+            ("refresh_token", refresh_token.as_str()),
+            ("grant_type", "refresh_token"),
+        ];
+        if let Some(ref secret) = self.github_client_secret {
+            params.push(("client_secret", secret.as_str()));
+        }
+
+        let response = self
+            .client
+            .post("https://github.com/login/oauth/access_token")
+            .header("Accept", "application/json")
+            .form(&params)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            anyhow::bail!("Failed to refresh GitHub access token: {}", error_text);
+        }
+
+        let json: Value = response.json().await?;
+        let new_access_token = json["access_token"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("No access_token in refresh response"))?;
+        let expires_in = json["expires_in"].as_u64().unwrap_or(3600);
+
+        {
+            let mut token_guard = self
+                .github_token
+                .write()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            *token_guard = new_access_token.to_string();
+        }
+
+        {
+            let mut expires_guard = self
+                .github_expires_at
+                .write()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            let now = std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_secs();
+            *expires_guard = Some(now + expires_in);
+        }
+
+        info!("GitHub OAuth access token refreshed successfully");
+        Ok(())
+    }
+
+    async fn ensure_valid_github_token(&self) -> Result<()> {
+        let should_refresh = {
+            let expires_at = self
+                .github_expires_at
+                .read()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            if let Some(expiry) = *expires_at {
+                let now = std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap_or_default()
+                    .as_secs();
+                now + 300 >= expiry
+            } else {
+                false
+            }
+        };
+
+        if should_refresh && self.github_refresh_token.is_some() {
+            self.refresh_github_token().await?;
+        }
+
+        Ok(())
+    }
+
+    async fn refresh_copilot_token(&self) -> Result<()> {
+        self.ensure_valid_github_token().await?;
+        let github_token = self
+            .github_token
+            .read()
+            .map_err(|_| anyhow::anyhow!("Lock error"))?
+            .clone();
+
+        debug!("Exchanging GitHub token for Copilot API token...");
+
+        let response = self
+            .client
+            .get("https://api.github.com/copilot_internal/v2/token")
+            .header("Authorization", format!("Bearer {}", github_token))
+            .header("User-Agent", "LocalGPT/1.0")
+            .header("Accept", "application/json")
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let error_text = response.text().await?;
+            anyhow::bail!("GitHub Copilot token exchange failed: {}", error_text);
+        }
+
+        let json: Value = response.json().await?;
+        let token = json["token"]
+            .as_str()
+            .ok_or_else(|| anyhow::anyhow!("No token in Copilot response"))?;
+        let expires_at = json["expires_at"]
+            .as_u64()
+            .ok_or_else(|| anyhow::anyhow!("No expires_at in Copilot response"))?;
+
+        // GitHub returns expires_at in seconds, but we defensively check
+        let expires_at_ms = if expires_at > 10_000_000_000 {
+            expires_at
+        } else {
+            expires_at * 1000
+        };
+
+        {
+            let mut token_guard = self
+                .copilot_token
+                .write()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            *token_guard = Some(token.to_string());
+        }
+        {
+            let mut expires_guard = self
+                .copilot_expires_at
+                .write()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            *expires_guard = expires_at_ms;
+        }
+
+        // Derive base URL from token if possible (proxy-ep=...)
+        if let Some(pos) = token.find("proxy-ep=") {
+            let rest = &token[pos + 9..];
+            let end = rest.find(';').unwrap_or(rest.len());
+            let proxy_url = &rest[..end];
+            let api_url = proxy_url.replace("proxy.", "api.");
+            let mut base_url_guard = self
+                .base_url
+                .write()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            *base_url_guard = api_url;
+        }
+
+        info!("GitHub Copilot API token acquired successfully");
+        Ok(())
+    }
+
+    async fn ensure_valid_token(&self) -> Result<String> {
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis() as u64;
+
+        let needs_refresh = {
+            let expires_at = self
+                .copilot_expires_at
+                .read()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            let token = self
+                .copilot_token
+                .read()
+                .map_err(|_| anyhow::anyhow!("Lock error"))?;
+            token.is_none() || now + 300_000 >= *expires_at // 5 min margin
+        };
+
+        if needs_refresh {
+            self.refresh_copilot_token().await?;
+        }
+
+        self.copilot_token
+            .read()
+            .map_err(|_| anyhow::anyhow!("Lock error"))?
+            .clone()
+            .ok_or_else(|| anyhow::anyhow!("Token missing after refresh"))
+    }
+}
+
+#[async_trait]
+impl LLMProvider for GitHubCopilotProvider {
+    fn name(&self) -> String {
+        "github-copilot".to_string()
+    }
+
+    fn token_update(&self) -> Option<OAuthTokenUpdate> {
+        let access_token = self.github_token.read().ok()?.clone();
+        let expires_at = *self.github_expires_at.read().ok()?;
+        Some(OAuthTokenUpdate {
+            provider: "github".to_string(),
+            access_token,
+            refresh_token: self.github_refresh_token.clone(),
+            expires_at,
+        })
+    }
+
+    async fn chat(
+        &self,
+        messages: &[Message],
+        tools: Option<&[ToolSchema]>,
+    ) -> Result<LLMResponse> {
+        let token = self.ensure_valid_token().await?;
+        let base_url = self
+            .base_url
+            .read()
+            .map_err(|_| anyhow::anyhow!("Lock error"))?
+            .clone();
+
+        // GitHub Copilot uses OpenAI-compatible API
+        let openai_provider =
+            OpenAIOAuthProvider::new(&token, None, None, None, None, &base_url, &self.model)?;
+
+        openai_provider.chat(messages, tools).await
+    }
+
+    async fn summarize(&self, text: &str) -> Result<String> {
+        let token = self.ensure_valid_token().await?;
+        let base_url = self
+            .base_url
+            .read()
+            .map_err(|_| anyhow::anyhow!("Lock error"))?
+            .clone();
+
+        let openai_provider =
+            OpenAIOAuthProvider::new(&token, None, None, None, None, &base_url, &self.model)?;
+
+        openai_provider.summarize(text).await
     }
 }
