@@ -21,7 +21,7 @@
   width: 24px;
   height: 24px;
   display: flex;
-  background: url('/logo/localgpt-icon-app.png') no-repeat center / contain;
+  background: url('/logo/localgpt-icon-app.svg') no-repeat center / contain;
 }
 
 .header-localgpt-app-link:hover {
@@ -33,7 +33,7 @@
   width: 24px;
   height: 24px;
   display: flex;
-  background: url('/logo/localgpt-icon.png') no-repeat center / contain;
+  background: url('/logo/localgpt-icon.svg') no-repeat center / contain;
 }
 
 .header-localgpt-gen-link:hover {

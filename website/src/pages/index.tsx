@@ -37,7 +37,7 @@ function HomepageHeader() {
         <div className={styles.heroLeft}>
           <div className={styles.heroLogos}>
             <img
-              src="/logo/localgpt-icon.png"
+              src="/logo/localgpt-icon.svg"
               alt={siteConfig.title}
               className={styles.heroIcon}
             />

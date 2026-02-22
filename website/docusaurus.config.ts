@@ -5,7 +5,7 @@ import type * as Preset from '@docusaurus/preset-classic';
 const config: Config = {
   title: 'LocalGPT',
   tagline: 'A local AI assistant with persistent memory, autonomous tasks, semantic search, and explorable world generation. Single binary, no runtime dependencies.',
-  favicon: 'logo/localgpt-icon.png',
+  favicon: 'logo/localgpt-icon.svg',
 
   url: 'https://localgpt.app',
   baseUrl: '/',
