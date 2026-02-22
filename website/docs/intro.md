@@ -72,6 +72,7 @@ LocalGPT automatically detects the provider based on model name prefix:
 
 - [Installation](/docs/installation) - Install LocalGPT on your system
 - [Quick Start](/docs/quick-start) - Get up and running in minutes
+- [Architecture](/docs/architecture) - Understand the crate structure and dependencies
 - [CLI Commands](/docs/cli-commands) - Learn the available commands
 - [Shell Sandbox](/docs/sandbox) - Understand the security sandbox
 - [LocalGPT.md](/docs/localgpt) - Your standing instructions to the AI

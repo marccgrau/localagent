@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "LocalGPT Gen — AI-driven 3D scene generation"
+readme = "README.md"
 keywords = ["ai", "3d", "scene-generation", "bevy", "localgpt"]
 categories = ["command-line-utilities", "graphics"]
 

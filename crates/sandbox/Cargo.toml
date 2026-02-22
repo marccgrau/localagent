@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "LocalGPT shell sandbox — kernel-enforced execution isolation"
+readme = "README.md"
 
 [dependencies]
 localgpt-core = { workspace = true }
