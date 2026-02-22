@@ -5,20 +5,21 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "Core library for LocalGPT — agent, memory, config, security"
+readme = "README.md"
 
 [features]
 default = ["embeddings-local", "claude-cli", "sqlite-vec"]
-# Local embeddings via fastembed (ONNX). Desktop default.
+# Local embeddings via fastembed (ONNX). Works on desktop and mobile.
 embeddings-local = ["fastembed"]
 # Claude CLI provider (requires subprocess execution — not available on mobile)
 claude-cli = []
 # GGUF embedding model support via llama.cpp (requires C++ compiler)
 embeddings-gguf = ["llama-cpp-2"]
-# OpenAI API embeddings (no native deps, always works on mobile)
+# OpenAI API embeddings (no native deps, requires API key)
 embeddings-openai = []
 # Disable all embeddings — FTS5 keyword search only
 embeddings-none = []
-# Sqlite vector search extension (requires native build, disable for mobile)
+# Sqlite vector search extension (works on mobile)
 sqlite-vec = ["dep:sqlite-vec"]
 # Legacy alias
 gguf = ["embeddings-gguf"]

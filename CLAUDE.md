@@ -107,11 +107,11 @@ Bridge daemons (all depend on core + bridge):
 │ localgpt-bridge-whatsapp│
 └─────────────────────────┘
 
-Mobile (core only, no desktop deps):
+Mobile (core with local embeddings):
 ┌─────────────────────────┐
 │ localgpt-mobile-ffi     │
 │ (default-features=false,│
-│  features=openai only)  │
+│  features=local+sqlite) │
 └─────────────────────────┘
 ```
 
@@ -121,13 +121,14 @@ Mobile (core only, no desktop deps):
 
 | Feature | Default | Purpose |
 |---------|---------|---------|
-| `embeddings-local` | yes | fastembed/ONNX local embeddings |
-| `embeddings-openai` | no | OpenAI API embeddings (mobile uses this) |
+| `embeddings-local` | yes | fastembed/ONNX local embeddings (works on mobile) |
+| `embeddings-openai` | no | OpenAI API embeddings |
 | `embeddings-gguf` | no | llama.cpp GGUF embeddings |
 | `embeddings-none` | no | FTS5 keyword search only |
+| `sqlite-vec` | yes | sqlite-vec vector search extension |
 | `claude-cli` | yes | ClaudeCliProvider (subprocess-based, excluded on mobile) |
 
-Mobile crate uses `default-features = false, features = ["embeddings-openai"]` — this excludes `embeddings-local` (fastembed/ONNX native deps) and `claude-cli` (subprocess execution).
+Mobile crate uses `default-features = false, features = ["embeddings-local", "sqlite-vec"]` — this excludes `claude-cli` (subprocess execution, not available on mobile).
 
 ### Key Patterns
 

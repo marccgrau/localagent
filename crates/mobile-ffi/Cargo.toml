@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 description = "LocalGPT mobile bindings via UniFFI"
+readme = "README.md"
 publish = false
 
 [lib]
@@ -16,7 +17,7 @@ name = "uniffi-bindgen"
 path = "uniffi-bindgen.rs"
 
 [dependencies]
-localgpt-core = { path = "../core", default-features = false, features = ["embeddings-openai"] }
+localgpt-core = { path = "../core", default-features = false, features = ["embeddings-local", "sqlite-vec"] }
 uniffi = { version = "0.31", features = ["cli"] }
 tokio = { workspace = true }
 anyhow = { workspace = true }

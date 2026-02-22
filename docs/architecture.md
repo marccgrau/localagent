@@ -1,5 +1,194 @@
 # LocalGPT Architecture
 
+## Workspace Structure
+
+LocalGPT is organized as a Cargo workspace with 10 crates:
+
+```
+crates/
+├── core/        # localgpt-core — shared library (agent, memory, config, security)
+├── cli/         # localgpt — binary with clap CLI, desktop GUI, dangerous tools
+├── server/      # localgpt-server — HTTP/WS API, Telegram bot, BridgeManager
+├── sandbox/     # localgpt-sandbox — Landlock/Seatbelt process sandboxing
+├── mobile-ffi/  # localgpt-mobile-ffi — UniFFI bindings for iOS/Android
+├── gen/         # localgpt-gen — Bevy 3D scene generation binary
+└── bridge/      # localgpt-bridge — secure IPC protocol for bridge daemons
+
+bridges/         # Standalone bridge binaries
+├── telegram/    # localgpt-bridge-telegram — Telegram bot daemon
+├── discord/     # localgpt-bridge-discord — Discord bot daemon
+└── whatsapp/    # localgpt-bridge-whatsapp — WhatsApp bridge daemon
+
+apps/            # Native mobile app projects (iOS, Android)
+```
+
+## Dependency Graph
+
+```
+                        ┌─────────────────┐
+                        │ localgpt-core   │  (no internal deps)
+                        └────────┬────────┘
+                                 │
+         ┌───────────────────────┼───────────────────────┐
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ localgpt-bridge │    │ localgpt-sandbox│    │ localgpt-gen    │
+│ (no internal    │    │                 │    │                 │
+│  deps)          │    └────────┬────────┘    └─────────────────┘
+└────────┬────────┘             │
+         │                      │
+         ▼                      │
+┌─────────────────┐             │
+│ localgpt-server │◄────────────┘
+│ (core + bridge) │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ localgpt (CLI)  │
+│ (core + server  │
+│  + sandbox)     │
+└─────────────────┘
+
+Bridge daemons (all depend on core + bridge):
+┌─────────────────────────┐
+│ localgpt-bridge-telegram│
+│ localgpt-bridge-discord │
+│ localgpt-bridge-whatsapp│
+└─────────────────────────┘
+
+Mobile (core with local embeddings):
+┌─────────────────────────┐
+│ localgpt-mobile-ffi     │
+│ (default-features=false,│
+│  features=local+sqlite) │
+└─────────────────────────┘
+```
+
+## Crate Summary
+
+| Crate | Type | Dependencies | Purpose |
+|-------|------|--------------|---------|
+| `localgpt-core` | lib | None | Agent, memory, config, security (mobile-compatible) |
+| `localgpt-bridge` | lib | None | IPC protocol for bridge daemons |
+| `localgpt-sandbox` | lib | core | Landlock/Seatbelt process isolation |
+| `localgpt-server` | lib | core, bridge | HTTP server, Telegram bot, BridgeManager |
+| `localgpt` | bin | core, server, sandbox | CLI binary with all features |
+| `localgpt-gen` | bin | core | 3D scene generation with Bevy |
+| `localgpt-mobile-ffi` | lib+bin | core (minimal) | UniFFI bindings for iOS/Android |
+| `localgpt-bridge-telegram` | bin | core, bridge | Telegram bot daemon |
+| `localgpt-bridge-discord` | bin | core, bridge | Discord bot daemon |
+| `localgpt-bridge-whatsapp` | bin | core, bridge | WhatsApp bridge daemon |
+
+## Detailed Crate Descriptions
+
+### Core Libraries
+
+#### `localgpt-core`
+Foundation library with zero platform-specific dependencies. Contains:
+- **Agent**: LLM provider abstraction (OpenAI, Anthropic, Ollama, Claude CLI, GLM)
+- **Memory**: SQLite FTS5 + markdown files + embeddings
+- **Config**: TOML configuration with workspace resolution
+- **Security**: HMAC signing, policy verification, audit logging
+- **Heartbeat**: Autonomous task runner
+- **Session**: Conversation management with compaction
+
+#### `localgpt-bridge`
+IPC protocol library for daemon-to-bridge communication:
+- **tarpc-based RPC**: Async service definitions
+- **Peer identity**: Unix socket UID/GID verification
+- **Credential exchange**: Secure credential retrieval
+- **Platform support**: Unix sockets (Unix), named pipes (Windows)
+
+### Desktop Libraries
+
+#### `localgpt-server`
+HTTP/WebSocket server and daemon services:
+- **Axum HTTP server**: REST API + embedded Web UI
+- **Telegram bot**: teloxide-based bot with streaming
+- **BridgeManager**: Unix socket server for bridge daemons
+- **WebSocket handler**: Real-time chat streaming
+
+#### `localgpt-sandbox`
+Process isolation for shell command execution:
+- **Linux**: Landlock + seccomp filters
+- **macOS**: Seatbelt (sandbox-init) profiles
+- **Windows**: Restricted token creation
+- **Graceful degradation**: Falls back to warning on unsupported systems
+
+### Binaries
+
+#### `localgpt` (CLI)
+Primary user-facing binary:
+- **Commands**: chat, ask, daemon, memory, config, bridge, gen, auth, init
+- **Features**: Desktop GUI (eframe), daemon mode, dangerous tools
+- **Target**: End users on desktop systems
+
+#### `localgpt-gen`
+3D scene generation with Bevy engine:
+- **Tools**: spawn_entity, modify_entity, set_material, set_ambience
+- **Audio**: Procedural environmental sounds via FunDSP
+- **Export**: glTF/GLB scene export
+
+### Mobile
+
+#### `localgpt-mobile-ffi`
+UniFFI bindings for iOS/Android:
+- **Library**: `staticlib` + `cdylib` for native linking
+- **Binary**: `uniffi-bindgen` for generating Swift/Kotlin bindings
+- **Features**: Uses `embeddings-local` + `sqlite-vec` (local embeddings work on mobile)
+- **Runtime**: Embedded tokio runtime
+
+```
+localgpt-mobile-ffi
+    │
+    ├── lib.rs          # UniFFI proc-macro exports
+    │   └── LocalGPTClient → AgentHandle (Arc<Mutex<Agent>>)
+    │
+    ├── uniffi-bindgen.rs  # Binary for generating bindings
+    │
+    └── Generated/
+        ├── Swift (iOS)    # apps/ios/Generated/
+        └── Kotlin (Android) # apps/android/Generated/
+```
+
+### Bridge Daemons
+
+#### `localgpt-bridge-telegram`
+Standalone Telegram bot daemon:
+- Connects to LocalGPT daemon via Unix socket
+- Supports streaming responses with edit updates
+- 6-digit pairing auth flow
+
+#### `localgpt-bridge-discord`
+Standalone Discord bot daemon:
+- serenity-based Discord gateway client
+- Same IPC protocol as Telegram bridge
+
+#### `localgpt-bridge-whatsapp`
+WhatsApp bridge daemon:
+- Uses baileys (Node.js) via embedded process
+- Axum server for baileys webhook events
+
+## Critical Design Rules
+
+1. **`localgpt-core` must have zero platform-specific dependencies**
+   - Must compile cleanly for `aarch64-apple-ios` and `aarch64-linux-android`
+   - No `clap`, `eframe`, `axum`, `teloxide`, `landlock`, `nix`, `tarpc`, etc.
+   - No dependency on `localgpt-bridge`
+
+2. **Mobile uses local embeddings**
+   - `default-features = false, features = ["embeddings-local", "sqlite-vec"]`
+   - Excludes `claude-cli` (subprocess execution not available on mobile)
+   - fastembed (ONNX) compiles successfully for iOS/Android
+
+3. **Bridge management lives in server**
+   - `BridgeManager` is in `localgpt-server`, not `localgpt-core`
+   - Desktop-only functionality (Unix sockets, peer identity)
+
+---
+
 ## Relationship with OpenClaw
 
 LocalGPT is a **fresh Rust implementation** inspired by OpenClaw's architecture, stripped down to essential components for local-only AI interaction.

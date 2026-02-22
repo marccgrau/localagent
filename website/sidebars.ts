@@ -36,7 +36,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Reference',
-      items: ['configuration', 'http-api'],
+      items: ['architecture', 'configuration', 'http-api'],
     },
   ],
 };
