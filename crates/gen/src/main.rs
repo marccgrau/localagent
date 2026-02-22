@@ -247,6 +247,22 @@ async fn run_agent_loop(
     let mut agent = Agent::new_with_tools(config.clone(), agent_id, memory, tools)?;
     agent.new_session().await?;
 
+    // Display model info (matching CLI format)
+    let embedding_status = if agent.has_embeddings() {
+        " | Embeddings: enabled"
+    } else {
+        ""
+    };
+    println!(
+        "LocalGPT Gen v{} | Agent: {} | Model: {} | Memory: {} chunks{}\n",
+        env!("CARGO_PKG_VERSION"),
+        agent_id,
+        agent.model(),
+        agent.memory_chunk_count(),
+        embedding_status
+    );
+    println!("Type /help for commands, /quit to exit\n");
+
     // If initial prompt given, send it
     if let Some(prompt) = initial_prompt {
         println!("\n> {}", prompt);
