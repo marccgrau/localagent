@@ -51,34 +51,71 @@ target/debug/uniffi-bindgen generate \
 
 LocalGPT is a local-only AI assistant with persistent markdown-based memory and optional autonomous operation via heartbeat.
 
-### Workspace (7 crates)
+### Workspace (10 crates)
 
 ```
 crates/
 ├── core/        # localgpt-core — shared library (agent, memory, config, security)
 ├── cli/         # localgpt — binary with clap CLI, desktop GUI, dangerous tools
-├── server/      # localgpt-server — HTTP/WS API, Telegram bot, embedded Web UI
+├── server/      # localgpt-server — HTTP/WS API, Telegram bot, BridgeManager
 ├── sandbox/     # localgpt-sandbox — Landlock/Seatbelt process sandboxing
 ├── mobile-ffi/  # localgpt-mobile-ffi — UniFFI bindings for iOS/Android
 ├── gen/         # localgpt-gen — Bevy 3D scene generation binary
 └── bridge/      # localgpt-bridge — secure IPC protocol for bridge daemons
 
-bridges/         # Standalone bridge binaries (Telegram, Discord, WhatsApp)
+bridges/         # Standalone bridge binaries
+├── telegram/    # localgpt-bridge-telegram — Telegram bot daemon
+├── discord/     # localgpt-bridge-discord — Discord bot daemon
+└── whatsapp/    # localgpt-bridge-whatsapp — WhatsApp bridge daemon
+
 apps/            # Native mobile app projects (iOS, Android)
 ```
 
 ### Dependency Graph
 
 ```
-localgpt ──→ localgpt-core
-             ──→ localgpt-server ──→ localgpt-core
-             ──→ localgpt-sandbox ──→ localgpt-core
+                        ┌─────────────────┐
+                        │ localgpt-core   │  (no internal deps)
+                        └────────┬────────┘
+                                 │
+         ┌───────────────────────┼───────────────────────┐
+         │                       │                       │
+         ▼                       ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│ localgpt-bridge │    │ localgpt-sandbox│    │ localgpt-gen    │
+│ (no internal    │    │                 │    │                 │
+│  deps)          │    └────────┬────────┘    └─────────────────┘
+└────────┬────────┘             │
+         │                      │
+         ▼                      │
+┌─────────────────┐             │
+│ localgpt-server │◄────────────┘
+│ (core + bridge) │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│ localgpt (CLI)  │
+│ (core + server  │
+│  + sandbox)     │
+└─────────────────┘
 
-localgpt-mobile-ffi ──→ localgpt-core (default-features = false, embeddings-openai)
-localgpt-gen        ──→ localgpt-core
+Bridge daemons (all depend on core + bridge):
+┌─────────────────────────┐
+│ localgpt-bridge-telegram│
+│ localgpt-bridge-discord │
+│ localgpt-bridge-whatsapp│
+└─────────────────────────┘
+
+Mobile (core only, no desktop deps):
+┌─────────────────────────┐
+│ localgpt-mobile-ffi     │
+│ (default-features=false,│
+│  features=openai only)  │
+└─────────────────────────┘
 ```
 
-**Critical rule:** `localgpt-core` must have zero platform-specific dependencies. It must compile cleanly for `aarch64-apple-ios` and `aarch64-linux-android`. No clap, eframe, axum, teloxide, landlock, nix, etc.
+**Critical rule:** `localgpt-core` must have zero platform-specific dependencies. It must compile cleanly for `aarch64-apple-ios` and `aarch64-linux-android`. No clap, eframe, axum, teloxide, landlock, nix, tarpc, localgpt-bridge, etc.
 
 ### Feature Flags (`localgpt-core`)
 

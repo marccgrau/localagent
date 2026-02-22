@@ -3,7 +3,8 @@ name = "localgpt-bridge-whatsapp"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
-publish = false
+repository.workspace = true
+description = "WhatsApp bridge for LocalGPT"
 
 [dependencies]
 anyhow = "1.0"

@@ -2,8 +2,9 @@
 name = "localgpt-bridge-discord"
 version.workspace = true
 edition.workspace = true
-description = "Discord bridge for LocalGPT"
 license.workspace = true
+repository.workspace = true
+description = "Discord bridge for LocalGPT"
 
 [dependencies]
 localgpt-core = { workspace = true }
