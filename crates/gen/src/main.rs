@@ -38,7 +38,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     // Initialize logging before handing off to Bevy
-    let log_level = if cli.verbose { "debug" } else { "info" };
+    // Use "warn" by default for cleaner interactive TUI, "debug" with --verbose
+    let log_level = if cli.verbose { "debug" } else { "warn" };
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -265,7 +266,7 @@ async fn run_agent_loop(
 
     // If initial prompt given, send it
     if let Some(prompt) = initial_prompt {
-        println!("\n> {}", prompt);
+        println!("\nYou: {}", prompt);
         let response = agent.chat(&prompt).await?;
         println!("\nLocalGPT: {}\n", response);
     }
@@ -273,7 +274,7 @@ async fn run_agent_loop(
     // Interactive loop
     let mut rl = DefaultEditor::new()?;
     loop {
-        let readline = rl.readline("> ");
+        let readline = rl.readline("You: ");
 
         let input = match readline {
             Ok(line) => line,

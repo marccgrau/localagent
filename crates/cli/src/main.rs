@@ -24,7 +24,8 @@ fn main() -> Result<()> {
     #[cfg(feature = "gen")]
     if let Commands::Gen(args) = cli.command {
         // Initialize logging before handing off to Bevy
-        let log_level = if cli.verbose { "debug" } else { "info" };
+        // Use "warn" by default for cleaner TUI, "debug" with --verbose
+        let log_level = if cli.verbose { "debug" } else { "warn" };
         tracing_subscriber::fmt()
             .with_env_filter(
                 tracing_subscriber::EnvFilter::try_from_default_env()
@@ -61,7 +62,8 @@ fn main() -> Result<()> {
 
 async fn async_main(cli: Cli) -> Result<()> {
     // Initialize logging
-    let log_level = if cli.verbose { "debug" } else { "info" };
+    // Use "warn" by default for cleaner TUI, "debug" with --verbose
+    let log_level = if cli.verbose { "debug" } else { "warn" };
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
