@@ -229,9 +229,9 @@ pub trait LLMProvider: Send + Sync {
 fn resolve_model_alias(model: &str) -> String {
     // OpenClaw-compatible aliases
     match model.to_lowercase().as_str() {
-        // Short aliases → latest 4.5 models
-        "opus" => "anthropic/claude-opus-4-5".to_string(),
-        "sonnet" => "anthropic/claude-sonnet-4-5".to_string(),
+        // Short aliases → latest 4.6 models
+        "opus" => "anthropic/claude-opus-4-6".to_string(),
+        "sonnet" => "anthropic/claude-sonnet-4-6".to_string(),
         "gpt" => "openai/gpt-4o".to_string(),
         "gpt-mini" => "openai/gpt-4o-mini".to_string(),
         "glm" => "glm/glm-4.7".to_string(),
@@ -246,11 +246,17 @@ fn normalize_model_id(provider: &str, model_id: &str) -> String {
     match provider {
         "anthropic" => {
             match model_id.to_lowercase().as_str() {
-                // Claude 4.5 models only
-                "claude-opus-4-5" | "opus" => "claude-opus-4-5-20251101".to_string(),
-                "claude-sonnet-4-5" | "sonnet" => "claude-sonnet-4-5-20250929".to_string(),
-                // Default to Opus 4.5 for any other input
-                _ => "claude-opus-4-5-20251101".to_string(),
+                // Claude 4.6 models (latest)
+                "claude-opus-4-6" | "opus" | "opus-4.6" => "claude-opus-4-6".to_string(),
+                "claude-sonnet-4-6" | "sonnet" | "sonnet-4.6" => "claude-sonnet-4-6".to_string(),
+                // Claude 4.5 models (still supported)
+                "claude-opus-4-5" | "opus-4.5" => "claude-opus-4-5-20251101".to_string(),
+                "claude-sonnet-4-5" | "sonnet-4.5" => "claude-sonnet-4-5-20250929".to_string(),
+                "claude-haiku-4-5" | "haiku" | "haiku-4.5" => {
+                    "claude-haiku-4-5-20251001".to_string()
+                }
+                // Default to Opus 4.6 (latest)
+                _ => "claude-opus-4-6".to_string(),
             }
         }
         _ => model_id.to_string(),
@@ -1962,9 +1968,12 @@ fn save_cli_session_to_store(
 #[cfg(feature = "claude-cli")]
 fn normalize_claude_model(model: &str) -> String {
     match model.to_lowercase().as_str() {
-        "opus" | "opus-4.5" | "opus-4" | "claude-opus-4-5" => "opus",
-        "sonnet" | "sonnet-4.5" | "sonnet-4.1" | "claude-sonnet-4-5" => "sonnet",
-        "haiku" | "haiku-3.5" | "claude-haiku-3-5" => "haiku",
+        "opus" | "opus-4.6" | "opus-4.5" | "opus-4" | "claude-opus-4-6" | "claude-opus-4-5" => {
+            "opus"
+        }
+        "sonnet" | "sonnet-4.6" | "sonnet-4.5" | "sonnet-4.1" | "claude-sonnet-4-6"
+        | "claude-sonnet-4-5" => "sonnet",
+        "haiku" | "haiku-4.5" | "haiku-3.5" | "claude-haiku-4-5" | "claude-haiku-3-5" => "haiku",
         other => other,
     }
     .to_string()
@@ -2453,8 +2462,8 @@ mod tests {
 
     #[test]
     fn test_resolve_model_alias() {
-        assert_eq!(resolve_model_alias("opus"), "anthropic/claude-opus-4-5");
-        assert_eq!(resolve_model_alias("sonnet"), "anthropic/claude-sonnet-4-5");
+        assert_eq!(resolve_model_alias("opus"), "anthropic/claude-opus-4-6");
+        assert_eq!(resolve_model_alias("sonnet"), "anthropic/claude-sonnet-4-6");
         assert_eq!(resolve_model_alias("gpt"), "openai/gpt-4o");
         assert_eq!(resolve_model_alias("gpt-mini"), "openai/gpt-4o-mini");
         assert_eq!(resolve_model_alias("grok"), "xai/grok-3-mini");
