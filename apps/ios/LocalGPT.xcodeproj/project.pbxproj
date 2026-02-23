@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		19DBF5D92F4BE63F00451E35 /* libc++.tbd in Frameworks */ = {isa = PBXBuildFile; fileRef = 19DBF5D82F4BE63F00451E35 /* libc++.tbd */; };
 		19EA94682F4BCE0F008DF3ED /* LocalGPTWrapper in Frameworks */ = {isa = PBXBuildFile; productRef = 19EA94672F4BCE0F008DF3ED /* LocalGPTWrapper */; };
 /* End PBXBuildFile section */
 
@@ -28,9 +29,10 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		19DC6E0C2F4BA39400826CD9 /* LocalGPT.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "LocalGPT.app"; sourceTree = BUILT_PRODUCTS_DIR; };
-		19DC6E192F4BA39500826CD9 /* LocalGPTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "LocalGPTTests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
-		19DC6E232F4BA39500826CD9 /* LocalGPTUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = "LocalGPTUITests.xctest"; sourceTree = BUILT_PRODUCTS_DIR; };
+		19DBF5D82F4BE63F00451E35 /* libc++.tbd */ = {isa = PBXFileReference; lastKnownFileType = "sourcecode.text-based-dylib-definition"; name = "libc++.tbd"; path = "Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk/usr/lib/libc++.tbd"; sourceTree = DEVELOPER_DIR; };
+		19DC6E0C2F4BA39400826CD9 /* LocalGPT.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = LocalGPT.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		19DC6E192F4BA39500826CD9 /* LocalGPTTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LocalGPTTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		19DC6E232F4BA39500826CD9 /* LocalGPTUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = LocalGPTUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		19EA94652F4BCD61008DF3ED /* LocalGPTWrapper */ = {isa = PBXFileReference; lastKnownFileType = wrapper; path = LocalGPTWrapper; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -57,6 +59,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				19DBF5D92F4BE63F00451E35 /* libc++.tbd in Frameworks */,
 				19EA94682F4BCE0F008DF3ED /* LocalGPTWrapper in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -103,6 +106,7 @@
 		19EA94662F4BCE0F008DF3ED /* Frameworks */ = {
 			isa = PBXGroup;
 			children = (
+				19DBF5D82F4BE63F00451E35 /* libc++.tbd */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
