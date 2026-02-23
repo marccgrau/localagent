@@ -1,17 +1,10 @@
 import SwiftUI
 import LocalGPTWrapper
 
-struct Message: Identifiable, Equatable {
-    let id = UUID()
-    let text: String
-    let isUser: Bool
-    let timestamp = Date()
-}
-
 struct ChatView: View {
     @StateObject private var viewModel = ChatViewModel()
     @State private var inputText = ""
-    
+
     var body: some View {
         NavigationStack {
             VStack {
@@ -23,7 +16,7 @@ struct ChatView: View {
                                 MessageBubble(message: message)
                                     .id(message.id)
                             }
-                            
+
                             if viewModel.isThinking {
                                 ThinkingIndicator()
                                     .id("thinking")
@@ -44,7 +37,7 @@ struct ChatView: View {
                         }
                     }
                 }
-                
+
                 // Input Area
                 HStack(spacing: 12) {
                     TextField("Ask LocalGPT...", text: $inputText, axis: .vertical)
@@ -52,7 +45,7 @@ struct ChatView: View {
                         .background(Color(.systemGray6))
                         .cornerRadius(20)
                         .lineLimit(1...5)
-                    
+
                     Button(action: sendMessage) {
                         Image(systemName: "arrow.up.circle.fill")
                             .font(.system(size: 32))
@@ -79,50 +72,13 @@ struct ChatView: View {
             }
         }
     }
-    
+
     private func sendMessage() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        
+
         inputText = ""
         viewModel.send(text: text)
-    }
-}
-
-struct MessageBubble: View {
-    let message: Message
-    
-    var body: some View {
-        HStack {
-            if message.isUser { Spacer() }
-            
-            Text(message.text)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 10)
-                .background(message.isUser ? Color.teal : Color(.systemGray5))
-                .foregroundColor(message.isUser ? .white : .primary)
-                .cornerRadius(18)
-                .textSelection(.enabled)
-            
-            if !message.isUser { Spacer() }
-        }
-    }
-}
-
-struct ThinkingIndicator: View {
-    @State private var dotCount = 0
-    let timer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
-    
-    var body: some View {
-        HStack {
-            Text("Thinking" + String(repeating: ".", count: dotCount))
-                .font(.caption)
-                .foregroundColor(.secondary)
-                .onReceive(timer) { _ in
-                    dotCount = (dotCount + 1) % 4
-                }
-            Spacer()
-        }
     }
 }
 
