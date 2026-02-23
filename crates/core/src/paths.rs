@@ -322,11 +322,11 @@ fn create_dir_with_mode(path: &Path) -> Result<()> {
     std::fs::create_dir_all(path)
         .with_context(|| format!("Failed to create directory: {}", path.display()))?;
 
-    #[cfg(unix)]
+    #[cfg(all(unix, not(target_os = "ios"), not(target_os = "android")))]
     {
         use std::os::unix::fs::PermissionsExt;
-        std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700))
-            .with_context(|| format!("Failed to set permissions on {}", path.display()))?;
+        // iOS/Android sandbox doesn't allow chmod - ignore silently
+        let _ = std::fs::set_permissions(path, std::fs::Permissions::from_mode(0o700));
     }
 
     Ok(())
