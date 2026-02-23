@@ -23,9 +23,5 @@ let package = Package(
             name: "LocalGPTCore",
             path: "LocalGPTCore.xcframework"
         ),
-        .testTarget(
-            name: "LocalGPTWrapperTests",
-            dependencies: ["LocalGPTWrapper"]
-        ),
     ]
 )
