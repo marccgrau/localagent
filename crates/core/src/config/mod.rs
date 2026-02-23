@@ -65,6 +65,17 @@ pub struct AgentConfig {
     /// Maximum tokens for LLM response
     #[serde(default = "default_max_tokens")]
     pub max_tokens: usize,
+
+    /// Maximum depth for spawn_agent tool (default: 1, no nested spawning)
+    /// - 0: spawn_agent tool disabled
+    /// - 1: single level only (subagents cannot spawn more agents)
+    /// - 2+: limited nesting allowed (not recommended)
+    #[serde(default)]
+    pub max_spawn_depth: Option<u8>,
+
+    /// Model to use for spawned subagents (default: same as default_model or claude-cli/sonnet)
+    #[serde(default)]
+    pub subagent_model: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -776,6 +787,8 @@ impl Default for AgentConfig {
             context_window: default_context_window(),
             reserve_tokens: default_reserve_tokens(),
             max_tokens: default_max_tokens(),
+            max_spawn_depth: Some(1), // Single-level spawning by default
+            subagent_model: None,     // Use default_model if not specified
         }
     }
 }
@@ -1152,6 +1165,10 @@ const DEFAULT_CONFIG_TEMPLATE: &str = r#"# LocalGPT Configuration
 default_model = "claude-cli/opus"
 context_window = 128000
 reserve_tokens = 8000
+
+# Spawn agent (subagent) configuration
+# max_spawn_depth = 1            # 0 = disabled, 1 = single level (default)
+# subagent_model = "claude-cli/sonnet"  # Model for subagents (default: same as default_model)
 
 # Anthropic API (for anthropic/* models)
 # [providers.anthropic]

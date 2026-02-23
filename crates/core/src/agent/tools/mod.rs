@@ -1,3 +1,4 @@
+pub mod spawn_agent;
 pub mod web_search;
 
 use anyhow::Result;
@@ -17,6 +18,7 @@ use super::providers::ToolSchema;
 use crate::config::{Config, SearchProviderType};
 use crate::memory::MemoryManager;
 
+use spawn_agent::{SpawnAgentTool, SpawnContext};
 use web_search::{SearchRouter, WebSearchTool};
 
 #[derive(Debug, Clone)]
@@ -86,6 +88,47 @@ pub fn create_safe_tools(
     }
 
     Ok(tools)
+}
+
+/// Create spawn_agent tool for hierarchical delegation.
+///
+/// This tool allows an agent to spawn specialist subagents for tasks like
+/// exploration, planning, implementation, or analysis.
+///
+/// # Arguments
+/// * `config` - Application configuration (cloned)
+/// * `memory` - Memory manager (shared with parent agent, required)
+///
+/// # Returns
+/// A boxed spawn_agent tool
+pub fn create_spawn_agent_tool(config: Config, memory: Arc<MemoryManager>) -> Box<dyn Tool> {
+    Box::new(SpawnAgentTool::from_config(config, memory))
+}
+
+/// Create spawn_agent tool with custom depth (for subagents).
+///
+/// Subagents get spawn_agent tool only if they're below the max depth.
+pub fn create_spawn_agent_tool_at_depth(
+    config: Config,
+    memory: Arc<MemoryManager>,
+    depth: u8,
+) -> Option<Box<dyn Tool>> {
+    let max_depth = config.agent.max_spawn_depth.unwrap_or(1);
+
+    if depth >= max_depth {
+        // At or past max depth, don't provide spawn_agent
+        return None;
+    }
+
+    let tool = SpawnAgentTool::new(SpawnContext {
+        depth,
+        config,
+        memory,
+        model: None,
+        max_depth,
+    });
+
+    Some(Box::new(tool))
 }
 
 // Memory Search Tool

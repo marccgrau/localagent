@@ -30,7 +30,10 @@ pub use system_prompt::{
     HEARTBEAT_OK_TOKEN, SILENT_REPLY_TOKEN, build_heartbeat_prompt, is_heartbeat_ok,
     is_silent_reply,
 };
-pub use tools::{Tool, ToolResult, extract_tool_detail};
+pub use tools::{
+    Tool, ToolResult, create_spawn_agent_tool, create_spawn_agent_tool_at_depth,
+    extract_tool_detail,
+};
 
 use anyhow::Result;
 use std::path::PathBuf;

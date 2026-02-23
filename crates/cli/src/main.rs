@@ -20,6 +20,16 @@ fn main() -> Result<()> {
 
     let cli = Cli::parse();
 
+    // Set LOCALGPT_PROFILE env var if --profile was provided
+    // This must be done early before any paths are resolved
+    if let Some(ref profile) = cli.profile {
+        // SAFETY: Setting env var early before any multi-threaded code runs
+        #[allow(unsafe_code)]
+        unsafe {
+            std::env::set_var("LOCALGPT_PROFILE", profile);
+        }
+    }
+
     // Handle Gen mode specially — Bevy must own the main thread (no tokio runtime here)
     #[cfg(feature = "gen")]
     if let Commands::Gen(args) = cli.command {

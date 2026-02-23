@@ -42,6 +42,10 @@ pub struct Cli {
         env = "LOCALGPT_AGENT"
     )]
     pub agent: String,
+
+    /// Workspace profile name (uses ~/.local/share/localgpt/workspace-{profile})
+    #[arg(short, long, global = true, env = "LOCALGPT_PROFILE")]
+    pub profile: Option<String>,
 }
 
 #[derive(Subcommand)]
