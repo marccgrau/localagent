@@ -35,3 +35,6 @@ target
 
 # Website dependencies
 website/node_modules/
+
+# Opencode
+opencode.json
