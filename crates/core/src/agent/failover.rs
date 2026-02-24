@@ -94,11 +94,7 @@ impl LLMProvider for FailoverProvider {
         for (i, provider) in self.providers.iter().enumerate() {
             // Skip if in cooldown
             if self.is_in_cooldown(i) {
-                warn!(
-                    "Provider {} ({}) in cooldown, skipping",
-                    i,
-                    provider.name()
-                );
+                warn!("Provider {} ({}) in cooldown, skipping", i, provider.name());
                 continue;
             }
 

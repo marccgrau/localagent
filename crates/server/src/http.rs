@@ -168,7 +168,10 @@ impl Server {
             .route("/api/saved-sessions", get(list_saved_sessions))
             .route("/api/saved-sessions/{session_id}", get(get_saved_session))
             .route("/api/logs/daemon", get(get_daemon_logs))
-            .layer(middleware::from_fn_with_state(state.clone(), auth_middleware));
+            .layer(middleware::from_fn_with_state(
+                state.clone(),
+                auth_middleware,
+            ));
 
         let app = public_routes
             .merge(api_routes)

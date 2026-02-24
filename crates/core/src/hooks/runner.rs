@@ -68,7 +68,11 @@ impl HookEngine {
             return HookDecision::Allow;
         }
 
-        debug!("Firing event '{}' to {} hook(s)", event_name, matching.len());
+        debug!(
+            "Firing event '{}' to {} hook(s)",
+            event_name,
+            matching.len()
+        );
 
         for hook in matching {
             match self.run_hook(hook, event).await {

@@ -59,10 +59,7 @@ pub fn discover_hooks(workspace: &Path) -> Vec<HookDef> {
     // Workspace hooks
     let workspace_hooks_dir = workspace.join("hooks");
     if let Ok(found) = load_hooks_from_dir(&workspace_hooks_dir) {
-        debug!(
-            "Found {} hooks in workspace",
-            found.len()
-        );
+        debug!("Found {} hooks in workspace", found.len());
         hooks.extend(found);
     }
 

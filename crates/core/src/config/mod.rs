@@ -828,8 +828,8 @@ impl Default for AgentConfig {
             context_window: default_context_window(),
             reserve_tokens: default_reserve_tokens(),
             max_tokens: default_max_tokens(),
-            max_spawn_depth: Some(1), // Single-level spawning by default
-            subagent_model: None,     // Use default_model if not specified
+            max_spawn_depth: Some(1),    // Single-level spawning by default
+            subagent_model: None,        // Use default_model if not specified
             fallback_models: Vec::new(), // No fallbacks by default
             max_tool_repeats: default_max_tool_repeats(), // Loop detection threshold
         }

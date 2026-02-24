@@ -157,35 +157,34 @@ impl Agent {
         let primary_provider = providers::create_provider(&config.model, app_config)?;
 
         // Wrap with FailoverProvider if fallback_models configured
-        let provider: Box<dyn LLMProvider> =
-            if app_config.agent.fallback_models.is_empty() {
-                primary_provider
-            } else {
-                let mut providers_vec = vec![primary_provider];
-                for model in &app_config.agent.fallback_models {
-                    match providers::create_provider(model, app_config) {
-                        Ok(p) => providers_vec.push(p),
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to create fallback provider for model '{}': {}",
-                                model,
-                                e
-                            );
-                        }
+        let provider: Box<dyn LLMProvider> = if app_config.agent.fallback_models.is_empty() {
+            primary_provider
+        } else {
+            let mut providers_vec = vec![primary_provider];
+            for model in &app_config.agent.fallback_models {
+                match providers::create_provider(model, app_config) {
+                    Ok(p) => providers_vec.push(p),
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to create fallback provider for model '{}': {}",
+                            model,
+                            e
+                        );
                     }
                 }
-                if providers_vec.len() > 1 {
-                    tracing::info!(
-                        "Failover enabled: {} → {}",
-                        config.model,
-                        app_config.agent.fallback_models.join(" → ")
-                    );
-                    Box::new(failover::FailoverProvider::new(providers_vec))
-                } else {
-                    // Only primary available, no wrapping needed
-                    providers_vec.remove(0)
-                }
-            };
+            }
+            if providers_vec.len() > 1 {
+                tracing::info!(
+                    "Failover enabled: {} → {}",
+                    config.model,
+                    app_config.agent.fallback_models.join(" → ")
+                );
+                Box::new(failover::FailoverProvider::new(providers_vec))
+            } else {
+                // Only primary available, no wrapping needed
+                providers_vec.remove(0)
+            }
+        };
 
         // Memory is already wrapped in Arc, create safe tools sharing it
         let tools = tools::create_safe_tools(app_config, Some(Arc::clone(&memory)))?;
@@ -316,34 +315,33 @@ impl Agent {
         let primary_provider = providers::create_provider(&agent_config.model, &app_config)?;
 
         // Wrap with FailoverProvider if fallback_models configured
-        let provider: Box<dyn LLMProvider> =
-            if app_config.agent.fallback_models.is_empty() {
-                primary_provider
-            } else {
-                let mut providers_vec = vec![primary_provider];
-                for model in &app_config.agent.fallback_models {
-                    match providers::create_provider(model, &app_config) {
-                        Ok(p) => providers_vec.push(p),
-                        Err(e) => {
-                            tracing::warn!(
-                                "Failed to create fallback provider for model '{}': {}",
-                                model,
-                                e
-                            );
-                        }
+        let provider: Box<dyn LLMProvider> = if app_config.agent.fallback_models.is_empty() {
+            primary_provider
+        } else {
+            let mut providers_vec = vec![primary_provider];
+            for model in &app_config.agent.fallback_models {
+                match providers::create_provider(model, &app_config) {
+                    Ok(p) => providers_vec.push(p),
+                    Err(e) => {
+                        tracing::warn!(
+                            "Failed to create fallback provider for model '{}': {}",
+                            model,
+                            e
+                        );
                     }
                 }
-                if providers_vec.len() > 1 {
-                    tracing::info!(
-                        "Failover enabled: {} → {}",
-                        agent_config.model,
-                        app_config.agent.fallback_models.join(" → ")
-                    );
-                    Box::new(failover::FailoverProvider::new(providers_vec))
-                } else {
-                    providers_vec.remove(0)
-                }
-            };
+            }
+            if providers_vec.len() > 1 {
+                tracing::info!(
+                    "Failover enabled: {} → {}",
+                    agent_config.model,
+                    app_config.agent.fallback_models.join(" → ")
+                );
+                Box::new(failover::FailoverProvider::new(providers_vec))
+            } else {
+                providers_vec.remove(0)
+            }
+        };
 
         // Load security policy
         let workspace = app_config.workspace_path();
@@ -741,8 +739,7 @@ impl Agent {
                             "SYSTEM: You have called '{}' {} times with the same arguments. \
                              This appears to be a loop. Please try a different approach or \
                              respond to the user explaining what went wrong.",
-                            tool_name,
-                            self.loop_detector.max_repeats
+                            tool_name, self.loop_detector.max_repeats
                         );
 
                         // Reset detector and return the message
