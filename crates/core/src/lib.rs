@@ -10,6 +10,7 @@ pub mod concurrency;
 pub mod config;
 pub mod env;
 pub mod heartbeat;
+pub mod hooks;
 pub mod memory;
 pub mod paths;
 pub mod security;
