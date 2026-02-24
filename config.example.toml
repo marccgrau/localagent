@@ -1,5 +1,15 @@
 # LocalGPT Configuration
-# Copy to ~/.localgpt/config.toml
+# Copy to ~/.config/localgpt/config.toml
+#
+# Environment Variables:
+#   LOCALGPT_PROFILE=work     - Profile isolation (suffixes all XDG dirs)
+#                                ~/.config/localgpt-work/
+#                                ~/.local/share/localgpt-work/
+#                                ~/.local/state/localgpt-work/
+#                                ~/.cache/localgpt-work/
+#   LOCALGPT_WORKSPACE=/path  - Override workspace directory
+#   LOCALGPT_CONFIG=/path     - Override config file path
+#   LOCALGPT_AGENT=main       - Agent ID (default: "main")
 
 [agent]
 # Default model to use for chat

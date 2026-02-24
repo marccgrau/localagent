@@ -1,4 +1,4 @@
-//! XDG Base Directory Specification compliant path resolution.
+//! XDG Base Directory Specification compliant path resolution with profile isolation.
 //!
 //! Every directory is resolved through a three-level fallback:
 //! 1. LocalGPT-specific env var (LOCALGPT_CONFIG_DIR, etc.)
@@ -6,6 +6,18 @@
 //! 3. Platform default (~/.config, etc.)
 //!
 //! All paths are absolute. Relative paths from env vars are ignored per XDG spec.
+//!
+//! # Profile Isolation
+//!
+//! When `LOCALGPT_PROFILE` is set (e.g., "work"), ALL directories get a `-{profile}` suffix
+//! for complete isolation, following OpenClaw's model:
+//!
+//! ```text
+//! default profile:  ~/.config/localgpt/, ~/.local/share/localgpt/workspace/
+//! work profile:     ~/.config/localgpt-work/, ~/.local/share/localgpt-work/workspace/
+//! ```
+//!
+//! This provides complete isolation: separate config, sessions, cache, workspace per profile.
 
 use anyhow::{Context, Result};
 #[cfg(unix)]
@@ -66,30 +78,33 @@ impl Paths {
         let strategy = etcetera::choose_base_strategy()
             .map_err(|e| anyhow::anyhow!("Failed to determine base directories: {}", e))?;
 
+        // Get profile suffix once - applies to ALL directories for complete isolation
+        let suffix = profile_suffix(&env_fn);
+
         let config_dir = env_or(&env_fn, LOCALGPT_CONFIG_DIR, || {
-            strategy.config_dir().join("localgpt")
+            strategy.config_dir().join(format!("localgpt{}", suffix))
         });
 
         let data_dir = env_or(&env_fn, LOCALGPT_DATA_DIR, || {
-            strategy.data_dir().join("localgpt")
+            strategy.data_dir().join(format!("localgpt{}", suffix))
         });
 
         let state_dir = env_or(&env_fn, LOCALGPT_STATE_DIR, || {
             // etcetera's choose_base_strategy gives XDG paths on all platforms.
             // state_dir() returns data_dir() as fallback on platforms without XDG_STATE_HOME.
             let base_state = strategy.state_dir().unwrap_or_else(|| strategy.data_dir());
-            base_state.join("localgpt")
+            base_state.join(format!("localgpt{}", suffix))
         });
 
         let cache_dir = env_or(&env_fn, LOCALGPT_CACHE_DIR, || {
-            strategy.cache_dir().join("localgpt")
+            strategy.cache_dir().join(format!("localgpt{}", suffix))
         });
 
-        // Workspace: independent override, then LOCALGPT_PROFILE, then default under data_dir
+        // Workspace: independent override via LOCALGPT_WORKSPACE, or default under data_dir
         let workspace = resolve_workspace(&env_fn, &data_dir);
 
-        // Runtime: XDG_RUNTIME_DIR or platform fallback
-        let runtime_dir = resolve_runtime_dir(&env_fn);
+        // Runtime: XDG_RUNTIME_DIR or platform fallback (with profile suffix)
+        let runtime_dir = resolve_runtime_dir(&env_fn, &suffix);
 
         Ok(Self {
             config_dir,
@@ -257,12 +272,27 @@ where
         .unwrap_or_else(default)
 }
 
-/// Resolve workspace path with LOCALGPT_WORKSPACE, LOCALGPT_PROFILE, or default.
+/// Get the profile suffix for directory names.
+/// Returns empty string for default/empty profile, "-{profile}" otherwise.
+fn profile_suffix<F>(env_fn: &F) -> String
+where
+    F: Fn(&str) -> std::result::Result<String, std::env::VarError>,
+{
+    if let Ok(profile) = env_fn(LOCALGPT_PROFILE) {
+        let trimmed = profile.trim().to_lowercase();
+        if !trimmed.is_empty() && trimmed != "default" {
+            return format!("-{}", trimmed);
+        }
+    }
+    String::new()
+}
+
+/// Resolve workspace path with LOCALGPT_WORKSPACE override or default under data_dir.
 fn resolve_workspace<F>(env_fn: &F, data_dir: &Path) -> PathBuf
 where
     F: Fn(&str) -> std::result::Result<String, std::env::VarError>,
 {
-    // Direct workspace override
+    // Direct workspace override takes precedence
     if let Ok(ws) = env_fn(LOCALGPT_WORKSPACE) {
         let trimmed = ws.trim();
         if !trimmed.is_empty() {
@@ -274,19 +304,12 @@ where
         }
     }
 
-    // Profile-based workspace
-    if let Ok(profile) = env_fn(LOCALGPT_PROFILE) {
-        let trimmed = profile.trim().to_lowercase();
-        if !trimmed.is_empty() && trimmed != "default" {
-            return data_dir.join(format!("workspace-{}", trimmed));
-        }
-    }
-
+    // Default workspace under data_dir (which already has profile suffix)
     data_dir.join("workspace")
 }
 
 /// Resolve runtime directory.
-fn resolve_runtime_dir<F>(env_fn: &F) -> Option<PathBuf>
+fn resolve_runtime_dir<F>(env_fn: &F, profile_suffix: &str) -> Option<PathBuf>
 where
     F: Fn(&str) -> std::result::Result<String, std::env::VarError>,
 {
@@ -296,23 +319,23 @@ where
     {
         let path = PathBuf::from(&dir);
         if path.is_absolute() {
-            return Some(path.join("localgpt"));
+            return Some(path.join(format!("localgpt{}", profile_suffix)));
         }
     }
 
-    // Fallback: $TMPDIR/localgpt-$UID on Unix
+    // Fallback: $TMPDIR/localgpt-{profile}-{$UID|user} on Unix/Windows
     #[cfg(unix)]
     {
         let uid = unsafe { getuid() };
         let tmpdir = env_fn("TMPDIR").unwrap_or_else(|_| "/tmp".to_string());
-        Some(PathBuf::from(tmpdir).join(format!("localgpt-{}", uid)))
+        Some(PathBuf::from(tmpdir).join(format!("localgpt{}-{}", profile_suffix, uid)))
     }
 
     #[cfg(not(unix))]
     {
         env_fn("TEMP").ok().map(|t| {
             let user = env_fn("USERNAME").unwrap_or_else(|_| "user".into());
-            PathBuf::from(t).join(format!("localgpt-{}", user))
+            PathBuf::from(t).join(format!("localgpt{}-{}", profile_suffix, user))
         })
     }
 }
@@ -416,16 +439,71 @@ mod tests {
     }
 
     #[test]
-    fn profile_creates_named_workspace() {
+    fn profile_suffixes_all_directories() {
         let mut env: HashMap<&str, &str> = HashMap::new();
         env.insert(LOCALGPT_PROFILE, "work");
 
         let paths = Paths::resolve_with_env(make_env(env)).unwrap();
+
+        // All directories should have -work suffix for complete isolation
         assert!(
-            paths.workspace.ends_with("workspace-work"),
+            paths.config_dir.ends_with("localgpt-work"),
+            "config_dir: {:?}",
+            paths.config_dir
+        );
+        assert!(
+            paths.data_dir.ends_with("localgpt-work"),
+            "data_dir: {:?}",
+            paths.data_dir
+        );
+        assert!(
+            paths.state_dir.ends_with("localgpt-work"),
+            "state_dir: {:?}",
+            paths.state_dir
+        );
+        assert!(
+            paths.cache_dir.ends_with("localgpt-work"),
+            "cache_dir: {:?}",
+            paths.cache_dir
+        );
+        // Workspace is just "workspace" under profile's data_dir (no double suffix)
+        assert!(
+            paths.workspace.ends_with("workspace"),
             "workspace: {:?}",
             paths.workspace
         );
+        assert!(
+            paths.workspace.to_string_lossy().contains("localgpt-work"),
+            "workspace should be under localgpt-work: {:?}",
+            paths.workspace
+        );
+    }
+
+    #[test]
+    fn profile_default_no_suffix() {
+        let mut env: HashMap<&str, &str> = HashMap::new();
+        env.insert(LOCALGPT_PROFILE, "default");
+
+        let paths = Paths::resolve_with_env(make_env(env)).unwrap();
+
+        // "default" profile should not add suffix
+        assert!(paths.config_dir.ends_with("localgpt"));
+        assert!(paths.data_dir.ends_with("localgpt"));
+        assert!(paths.workspace.ends_with("workspace"));
+    }
+
+    #[test]
+    fn workspace_override_independent_of_profile() {
+        let mut env: HashMap<&str, &str> = HashMap::new();
+        env.insert(LOCALGPT_PROFILE, "work");
+        env.insert(LOCALGPT_WORKSPACE, "/custom/workspace");
+
+        let paths = Paths::resolve_with_env(make_env(env)).unwrap();
+
+        // Workspace override takes precedence
+        assert_eq!(paths.workspace, PathBuf::from("/custom/workspace"));
+        // But other dirs still have profile suffix
+        assert!(paths.data_dir.ends_with("localgpt-work"));
     }
 
     #[test]

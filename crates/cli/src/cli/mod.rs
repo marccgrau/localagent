@@ -43,7 +43,7 @@ pub struct Cli {
     )]
     pub agent: String,
 
-    /// Workspace profile name (uses ~/.local/share/localgpt/workspace-{profile})
+    /// Profile name for complete isolation (suffixes all XDG dirs: ~/.config/localgpt-{profile}, etc.)
     #[arg(short, long, global = true, env = "LOCALGPT_PROFILE")]
     pub profile: Option<String>,
 }
