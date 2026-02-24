@@ -27,8 +27,8 @@ pub use session::{
 pub use session_store::{SessionEntry, SessionStore};
 pub use skills::{Skill, SkillInvocation, get_skills_summary, load_skills, parse_skill_command};
 pub use system_prompt::{
-    HEARTBEAT_OK_TOKEN, SILENT_REPLY_TOKEN, build_heartbeat_prompt, is_heartbeat_ok,
-    is_silent_reply,
+    HEARTBEAT_OK_TOKEN, SILENT_REPLY_TOKEN, build_heartbeat_prompt, filter_silent_reply,
+    is_heartbeat_ok, is_silent_reply,
 };
 pub use tools::{
     Tool, ToolResult, create_spawn_agent_tool, create_spawn_agent_tool_at_depth,
@@ -573,6 +573,10 @@ impl Agent {
         // Handle tool calls if any
         let final_response = self.handle_response(response).await?;
 
+        // Filter out NO_REPLY silent tokens — small/local models may output these
+        // literally instead of answering, so don't leak them to users
+        let final_response = filter_silent_reply(final_response);
+
         // Add assistant response
         self.session.add_message(Message {
             role: Role::Assistant,
@@ -758,6 +762,10 @@ impl Agent {
         let final_response = self
             .handle_response_saving_session(response, agent_id)
             .await?;
+
+        // Filter out NO_REPLY silent tokens — small/local models may output these
+        // literally instead of answering, so don't leak them to users
+        let final_response = filter_silent_reply(final_response);
 
         // Add assistant response
         self.session.add_message(Message {
@@ -1490,6 +1498,10 @@ impl Agent {
 
                         match resp.content {
                             LLMResponseContent::Text(text) => {
+                                // Filter out NO_REPLY silent tokens — small/local models
+                                // may output these literally instead of answering
+                                let text = filter_silent_reply(text);
+
                                 // No tool calls - yield the text and we're done
                                 yield Ok(StreamEvent::Content(text.clone()));
                                 yield Ok(StreamEvent::Done);

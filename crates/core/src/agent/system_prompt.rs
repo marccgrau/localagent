@@ -287,7 +287,19 @@ pub fn is_heartbeat_ok(response: &str) -> bool {
 /// Check if a response is a silent reply (no user-visible output needed)
 pub fn is_silent_reply(response: &str) -> bool {
     let trimmed = response.trim();
-    trimmed == SILENT_REPLY_TOKEN || trimmed.contains(SILENT_REPLY_TOKEN)
+    // Exact match, or match after stripping quote marks that small models may add
+    trimmed == SILENT_REPLY_TOKEN
+        || trimmed.trim_matches(|c: char| c == '"' || c == '\'' || c == '`') == SILENT_REPLY_TOKEN
+}
+
+/// Filter out NO_REPLY silent tokens from user-facing responses.
+/// Small/local models may output these literally instead of answering.
+pub fn filter_silent_reply(response: String) -> String {
+    if is_silent_reply(&response) {
+        String::new()
+    } else {
+        response
+    }
 }
 
 #[cfg(test)]
@@ -310,6 +322,23 @@ mod tests {
     fn test_is_silent_reply() {
         assert!(is_silent_reply("NO_REPLY"));
         assert!(is_silent_reply(" NO_REPLY "));
+        assert!(is_silent_reply("\"NO_REPLY\""));
+        assert!(is_silent_reply("'NO_REPLY'"));
+        assert!(is_silent_reply("`NO_REPLY`"));
         assert!(!is_silent_reply("Here is my reply"));
+        assert!(!is_silent_reply("I got NO_REPLY from the server"));
+        assert!(!is_silent_reply(
+            "The response was NO_REPLY which means nothing"
+        ));
+    }
+
+    #[test]
+    fn test_filter_silent_reply() {
+        assert_eq!(filter_silent_reply("NO_REPLY".to_string()), "");
+        assert_eq!(filter_silent_reply(" NO_REPLY ".to_string()), "");
+        assert_eq!(
+            filter_silent_reply("Hello world".to_string()),
+            "Hello world"
+        );
     }
 }
