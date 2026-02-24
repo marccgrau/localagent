@@ -519,6 +519,28 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
             )?))
         }
 
+        "openai-compat" | "openai_compat" => {
+            let compat_config = config.providers.openai_compatible.as_ref().ok_or_else(|| {
+                anyhow::anyhow!(
+                    "OpenAI-compatible provider not configured.\n\
+                    Add to {}/config.toml:\n\n\
+                    [providers.openai_compatible]\n\
+                    base_url = \"https://openrouter.ai/api/v1\"\n\
+                    api_key = \"${{YOUR_API_KEY}}\"\n\
+                    # Optional extra headers:\n\
+                    # extra_headers = {{ \"HTTP-Referer\" = \"https://localgpt.app\" }}",
+                    DEFAULT_CONFIG_DIR_STR
+                )
+            })?;
+
+            Ok(Box::new(OpenAICompatibleProvider::new(
+                &compat_config.base_url,
+                &compat_config.api_key,
+                &model_id,
+                compat_config.extra_headers.clone(),
+            )?))
+        }
+
         _ => {
             // Fallback: try Claude CLI if configured
             #[cfg(feature = "claude-cli")]
@@ -539,7 +561,8 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
                 - glm/glm-4.7\n  \
                 - claude-cli/opus, claude-cli/sonnet\n  \
                 - gemini-cli/gemini-2.0-flash\n  \
-                - ollama/llama3, ollama/mistral\n\n\
+                - ollama/llama3, ollama/mistral\n  \
+                - openai-compat/<model> (OpenRouter, DeepSeek, Groq, etc.)\n\n\
                 Or use aliases: opus, sonnet, haiku, gpt, gpt-mini, grok, glm",
                 provider,
                 model
@@ -700,6 +723,233 @@ impl LLMProvider for OpenAIProvider {
         let choice = response_body["choices"]
             .get(0)
             .ok_or_else(|| anyhow::anyhow!("No choices in response"))?;
+
+        let message = &choice["message"];
+
+        // Parse usage
+        let usage = response_body.get("usage").map(|u| Usage {
+            input_tokens: u["prompt_tokens"].as_u64().unwrap_or(0),
+            output_tokens: u["completion_tokens"].as_u64().unwrap_or(0),
+        });
+
+        // Check for tool calls
+        if let Some(tool_calls) = message.get("tool_calls")
+            && let Some(calls) = tool_calls.as_array()
+        {
+            let parsed_calls: Vec<ToolCall> = calls
+                .iter()
+                .map(|tc| ToolCall {
+                    id: tc["id"].as_str().unwrap_or("").to_string(),
+                    name: tc["function"]["name"].as_str().unwrap_or("").to_string(),
+                    arguments: tc["function"]["arguments"]
+                        .as_str()
+                        .unwrap_or("{}")
+                        .to_string(),
+                })
+                .collect();
+
+            if !parsed_calls.is_empty() {
+                return Ok(LLMResponse {
+                    content: LLMResponseContent::ToolCalls(parsed_calls),
+                    usage,
+                });
+            }
+        }
+
+        let content = message["content"].as_str().unwrap_or("").to_string();
+
+        Ok(LLMResponse {
+            content: LLMResponseContent::Text(content),
+            usage,
+        })
+    }
+
+    async fn summarize(&self, text: &str) -> Result<String> {
+        let messages = vec![Message {
+            role: Role::User,
+            content: format!(
+                "Summarize the following conversation concisely, preserving key information and context:\n\n{}",
+                text
+            ),
+            tool_calls: None,
+            tool_call_id: None,
+            images: Vec::new(),
+        }];
+
+        match self.chat(&messages, None).await?.content {
+            LLMResponseContent::Text(summary) => Ok(summary),
+            _ => anyhow::bail!("Unexpected response type"),
+        }
+    }
+}
+
+// OpenAI-Compatible Provider (OpenRouter, DeepSeek, Groq, vLLM, LiteLLM, Together AI, etc.)
+pub struct OpenAICompatibleProvider {
+    client: Client,
+    base_url: String,
+    api_key: String,
+    model: String,
+    extra_headers: std::collections::HashMap<String, String>,
+}
+
+impl OpenAICompatibleProvider {
+    pub fn new(
+        base_url: &str,
+        api_key: &str,
+        model: &str,
+        extra_headers: std::collections::HashMap<String, String>,
+    ) -> Result<Self> {
+        Ok(Self {
+            client: Client::new(),
+            base_url: base_url.trim_end_matches('/').to_string(),
+            api_key: api_key.to_string(),
+            model: model.to_string(),
+            extra_headers,
+        })
+    }
+
+    fn format_tools(&self, tools: &[ToolSchema]) -> Vec<Value> {
+        tools
+            .iter()
+            .map(|t| {
+                json!({
+                    "type": "function",
+                    "function": {
+                        "name": t.name,
+                        "description": t.description,
+                        "parameters": t.parameters
+                    }
+                })
+            })
+            .collect()
+    }
+
+    fn format_messages(&self, messages: &[Message]) -> Vec<Value> {
+        messages
+            .iter()
+            .map(|m| {
+                let role = match m.role {
+                    Role::System => "system",
+                    Role::User => "user",
+                    Role::Assistant => "assistant",
+                    Role::Tool => "tool",
+                };
+
+                // Handle multimodal content for user messages with images
+                let content: Value = if m.role == Role::User && !m.images.is_empty() {
+                    let mut content_parts: Vec<Value> = Vec::new();
+
+                    // Add images first (OpenAI uses data URLs)
+                    for img in &m.images {
+                        content_parts.push(json!({
+                            "type": "image_url",
+                            "image_url": {
+                                "url": format!("data:{};base64,{}", img.media_type, img.data)
+                            }
+                        }));
+                    }
+
+                    // Add text content
+                    if !m.content.is_empty() {
+                        content_parts.push(json!({
+                            "type": "text",
+                            "text": m.content
+                        }));
+                    }
+
+                    json!(content_parts)
+                } else {
+                    json!(m.content)
+                };
+
+                let mut msg = json!({
+                    "role": role,
+                    "content": content
+                });
+
+                if let Some(ref tool_calls) = m.tool_calls {
+                    msg["tool_calls"] = json!(
+                        tool_calls
+                            .iter()
+                            .map(|tc| {
+                                json!({
+                                    "id": tc.id,
+                                    "type": "function",
+                                    "function": {
+                                        "name": tc.name,
+                                        "arguments": tc.arguments
+                                    }
+                                })
+                            })
+                            .collect::<Vec<_>>()
+                    );
+                }
+
+                if let Some(ref tool_call_id) = m.tool_call_id {
+                    msg["tool_call_id"] = json!(tool_call_id);
+                }
+
+                msg
+            })
+            .collect()
+    }
+}
+
+#[async_trait]
+impl LLMProvider for OpenAICompatibleProvider {
+    fn name(&self) -> String {
+        format!("openai_compatible({})", self.base_url)
+    }
+
+    async fn chat(
+        &self,
+        messages: &[Message],
+        tools: Option<&[ToolSchema]>,
+    ) -> Result<LLMResponse> {
+        let mut body = json!({
+            "model": self.model,
+            "messages": self.format_messages(messages)
+        });
+
+        if let Some(tools) = tools
+            && !tools.is_empty()
+        {
+            body["tools"] = json!(self.format_tools(tools));
+        }
+
+        debug!(
+            "OpenAI-Compatible request to {}: {}",
+            self.base_url,
+            serde_json::to_string_pretty(&body)?
+        );
+
+        let mut request = self
+            .client
+            .post(format!("{}/chat/completions", self.base_url))
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Content-Type", "application/json");
+
+        // Add extra headers from config
+        for (key, value) in &self.extra_headers {
+            request = request.header(key, value);
+        }
+
+        let response = request.json(&body).send().await?;
+
+        let response_body: Value = response.json().await?;
+        debug!(
+            "OpenAI-Compatible response: {}",
+            serde_json::to_string_pretty(&response_body)?
+        );
+
+        // Check for errors
+        if let Some(error) = response_body.get("error") {
+            anyhow::bail!("OpenAI-Compatible API error from {}: {}", self.base_url, error);
+        }
+
+        let choice = response_body["choices"]
+            .get(0)
+            .ok_or_else(|| anyhow::anyhow!("No choices in response from {}", self.base_url))?;
 
         let message = &choice["message"];
 

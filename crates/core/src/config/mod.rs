@@ -354,6 +354,25 @@ pub struct ProvidersConfig {
 
     #[serde(default)]
     pub github_copilot: Option<GitHubOAuthConfig>,
+
+    /// Generic OpenAI-compatible provider for any endpoint speaking the OpenAI Chat Completions API
+    /// (OpenRouter, DeepSeek, Groq, vLLM, LiteLLM, Together AI, Fireworks, etc.)
+    #[serde(default)]
+    pub openai_compatible: Option<OpenAICompatibleConfig>,
+}
+
+/// Configuration for OpenAI-compatible providers (OpenRouter, DeepSeek, Groq, etc.)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OpenAICompatibleConfig {
+    /// Base URL for the API endpoint (e.g., "https://openrouter.ai/api/v1")
+    pub base_url: String,
+
+    /// API key for authentication (supports ${ENV_VAR} expansion)
+    pub api_key: String,
+
+    /// Extra headers to include in every request (e.g., OpenRouter attribution)
+    #[serde(default)]
+    pub extra_headers: std::collections::HashMap<String, String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1016,6 +1035,10 @@ impl Config {
                 *client_secret = expand_env(client_secret);
             }
         }
+        if let Some(ref mut openai_compat) = self.providers.openai_compatible {
+            openai_compat.api_key = expand_env(&openai_compat.api_key);
+            openai_compat.base_url = expand_env(&openai_compat.base_url);
+        }
     }
 
     pub fn get_value(&self, key: &str) -> Result<String> {
@@ -1182,6 +1205,14 @@ reserve_tokens = 8000
 # [providers.xai]
 # api_key = "${XAI_API_KEY}"
 # base_url = "https://api.x.ai/v1"
+
+# OpenAI-Compatible provider (OpenRouter, DeepSeek, Groq, vLLM, LiteLLM, etc.)
+# [providers.openai_compatible]
+# base_url = "https://openrouter.ai/api/v1"
+# api_key = "${OPENROUTER_API_KEY}"
+# # Optional extra headers (e.g., OpenRouter attribution)
+# extra_headers = { "HTTP-Referer" = "https://localgpt.app", "X-Title" = "LocalGPT" }
+# # Use with: localgpt chat --model openai-compat/deepseek-chat
 
 # Claude CLI (for claude-cli/* models, requires claude CLI installed)
 [providers.claude_cli]
