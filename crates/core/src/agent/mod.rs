@@ -1088,13 +1088,15 @@ impl Agent {
 
     /// Handle LLM response with callback for tool executions
     /// This version calls the callback before executing each tool (including recursive calls)
-    async fn handle_response_with_callback<F>(
+    async fn handle_response_with_callback<F1, F2>(
         &mut self,
         response: LLMResponse,
-        on_tool_start: &mut F,
+        on_tool_start: &mut F1,
+        on_tool_end: &mut F2,
     ) -> Result<String>
     where
-        F: FnMut(&str, &str) + Send,
+        F1: FnMut(&str, &str) + Send,
+        F2: FnMut(&str, Result<(), &str>) + Send,
     {
         // Track usage
         self.add_usage(response.usage);
@@ -1116,8 +1118,14 @@ impl Agent {
 
                     let result = self.execute_tool(call).await;
                     let output = match result {
-                        Ok((content, _warnings)) => content,
-                        Err(e) => format!("Error: {}", e),
+                        Ok((content, _warnings)) => {
+                            on_tool_end(&call.name, Ok(()));
+                            content
+                        }
+                        Err(e) => {
+                            on_tool_end(&call.name, Err(&e.to_string()));
+                            format!("Error: {}", e)
+                        }
                     };
                     results.push(ToolResult {
                         call_id: call.id.clone(),
@@ -1157,7 +1165,12 @@ impl Agent {
                 let _ = self.handle_token_update();
 
                 // Recursively handle (in case of more tool calls)
-                Box::pin(self.handle_response_with_callback(next_response, on_tool_start)).await
+                Box::pin(self.handle_response_with_callback(
+                    next_response,
+                    on_tool_start,
+                    on_tool_end,
+                ))
+                .await
             }
         }
     }
@@ -1619,14 +1632,17 @@ impl Agent {
     /// Execute tool calls that were accumulated during streaming
     /// Returns (final_response, Vec<(tool_name, warnings)>)
     /// The on_tool_start callback is called before each tool executes (including recursive calls)
-    pub async fn execute_streaming_tool_calls<F>(
+    /// The on_tool_end callback is called after each tool executes
+    pub async fn execute_streaming_tool_calls<F1, F2>(
         &mut self,
         text_response: &str,
         tool_calls: Vec<ToolCall>,
-        mut on_tool_start: F,
+        mut on_tool_start: F1,
+        mut on_tool_end: F2,
     ) -> Result<(String, Vec<(String, Vec<String>)>)>
     where
-        F: FnMut(&str, &str) + Send,
+        F1: FnMut(&str, &str) + Send,
+        F2: FnMut(&str, Result<(), &str>) + Send,
     {
         // Add assistant message with tool calls
         self.session.add_message(Message {
@@ -1651,8 +1667,14 @@ impl Agent {
 
             let result = self.execute_tool(call).await;
             let (output, warnings) = match result {
-                Ok((content, warnings)) => (content, warnings),
-                Err(e) => (format!("Error: {}", e), Vec::new()),
+                Ok((content, warnings)) => {
+                    on_tool_end(&call.name, Ok(()));
+                    (content, warnings)
+                }
+                Err(e) => {
+                    on_tool_end(&call.name, Err(&e.to_string()));
+                    (format!("Error: {}", e), Vec::new())
+                }
             };
             if !warnings.is_empty() {
                 all_warnings.push((call.name.clone(), warnings));
@@ -1687,7 +1709,7 @@ impl Agent {
 
         // Handle the response (may have more tool calls)
         let final_response = self
-            .handle_response_with_callback(response, &mut on_tool_start)
+            .handle_response_with_callback(response, &mut on_tool_start, &mut on_tool_end)
             .await?;
 
         // Add final response to session

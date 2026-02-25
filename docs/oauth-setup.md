@@ -153,9 +153,9 @@ export GOOGLE_CLOUD_PROJECT="your-project-id"  # If using project-scoped access
 Use Gemini models with the `gemini/` prefix:
 
 ```bash
-localgpt ask "Hello" --model gemini/gemini-2.0-flash
+localgpt ask "Hello" --model gemini/gemini-3.1-pro-preview
 # or
-localgpt ask "Hello" --model gemini-2.0-flash  # auto-routed
+localgpt ask "Hello" --model gemini-3.1-pro-preview  # auto-routed
 ```
 
 ### References

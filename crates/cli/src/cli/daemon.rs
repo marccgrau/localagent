@@ -581,17 +581,40 @@ async fn show_status() -> Result<()> {
         println!("PID: {}", pid.trim());
     }
 
-    println!("\nConfiguration:");
+    if running {
+        println!("\nConfiguration (Active):");
+    } else {
+        println!("\nConfiguration (Inactive):");
+    }
     println!("  Heartbeat enabled: {}", config.heartbeat.enabled);
     if config.heartbeat.enabled {
         println!("  Heartbeat interval: {}", config.heartbeat.interval);
+        if let Some(timeout) = &config.heartbeat.timeout {
+            println!("  Heartbeat timeout: {}", timeout);
+        }
     }
-    println!("  Server enabled: {}", config.server.enabled);
+    println!("  Cron enabled: {}", !config.cron.jobs.is_empty());
+    if !config.cron.jobs.is_empty() {
+        println!("  Cron jobs: {}", config.cron.jobs.len());
+    }
+    let telegram_enabled = config.telegram.as_ref().map_or(false, |t| t.enabled);
+    println!("  Telegram enabled: {}", telegram_enabled);
+    println!("  HTTP Server enabled: {}", config.server.enabled);
     if config.server.enabled {
         println!(
-            "  Server address: http://{}:{}",
+            "  HTTP Server address: http://{}:{}",
             config.server.bind, config.server.port
         );
+    }
+
+    if let Ok(paths) = localgpt_core::paths::Paths::resolve() {
+        println!("  Workspace: {}", paths.workspace.display());
+        println!("  Locks directory: {}", paths.locks_dir().display());
+        println!("  Logs directory: {}", paths.logs_dir().display());
+        if let Ok(log_file) = get_log_file(0) {
+            println!("  Current log: {}", log_file.display());
+        }
+        println!("  Bridge socket: {}", paths.bridge_socket_name());
     }
 
     Ok(())

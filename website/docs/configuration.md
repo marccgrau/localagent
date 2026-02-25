@@ -37,11 +37,15 @@ EOF
 [agent]
 # Default model to use for chat
 # Prefix determines provider:
-#   claude-cli/* → Claude CLI (uses installed claude command)
-#   anthropic/*  → Anthropic API
-#   openai/*     → OpenAI
-#   glm/* or glm → GLM (Z.AI)
-#   ollama/*     → Ollama
+#   claude-cli/*       → Claude CLI (uses installed claude command)
+#   gemini-cli/*       → Gemini CLI (uses installed gemini command)
+#   codex-cli/*        → Codex CLI (uses installed codex command)
+#   anthropic/*        → Anthropic API
+#   openai/*           → OpenAI
+#   openai-compatible/*→ OpenAI-compatible server (OpenRouter, DeepSeek, etc.)
+#   github-copilot/*   → GitHub Copilot API
+#   glm/* or glm       → GLM (Z.AI)
+#   ollama/*           → Ollama
 #   Aliases: opus, sonnet, gpt, gpt-mini
 default_model = "claude-cli/opus"
 
@@ -81,6 +85,39 @@ model = "llama3"
 [providers.glm]
 # GLM (Z.AI) API key
 api_key = "${GLM_API_KEY}"
+
+[providers.claude_cli]
+command = "claude"
+model = "opus"
+
+[providers.gemini_cli]
+command = "gemini"
+model = "gemini-3.1-pro-preview"
+
+[providers.codex_cli]
+command = "codex"
+model = "gpt-4o"
+
+[providers.github_copilot]
+# GitHub Copilot OAuth token
+access_token = "${GITHUB_COPILOT_TOKEN}"
+
+[providers.openai_compatible]
+# Generic OpenAI-compatible endpoint (OpenRouter, DeepSeek, etc.)
+api_key = "${OPENROUTER_API_KEY}"
+base_url = "https://openrouter.ai/api/v1"
+
+[providers.openai_oauth]
+# OpenAI OAuth for ChatGPT subscription plans
+access_token = "${OPENAI_OAUTH_TOKEN}"
+
+[providers.anthropic_oauth]
+# Anthropic OAuth for Claude subscription plans
+access_token = "${ANTHROPIC_OAUTH_TOKEN}"
+
+[providers.gemini_oauth]
+# Gemini OAuth for Google AI subscription plans
+access_token = "${GEMINI_OAUTH_TOKEN}"
 
 #──────────────────────────────────────────────────────────────────────────────
 # Tool Settings
@@ -288,6 +325,15 @@ default_model = "openai/gpt-4o"  # or openai/gpt-4o-mini, or alias: gpt
 api_key = "${OPENAI_API_KEY}"
 ```
 
+**OAuth Setup (for ChatGPT Plus/Pro/Team plans):**
+You can use OAuth instead of an API key to leverage your subscription quota:
+
+```toml
+[providers.openai_oauth]
+access_token = "${OPENAI_OAUTH_TOKEN}"
+# refresh_token = "${OPENAI_OAUTH_REFRESH_TOKEN}"  # Optional
+```
+
 ### Anthropic
 
 ```toml
@@ -296,6 +342,15 @@ default_model = "anthropic/claude-opus-4-5"  # or anthropic/claude-sonnet-4-5, o
 
 [providers.anthropic]
 api_key = "${ANTHROPIC_API_KEY}"
+```
+
+**OAuth Setup (for Claude Pro/Max plans):**
+You can use OAuth instead of an API key to leverage your subscription quota:
+
+```toml
+[providers.anthropic_oauth]
+access_token = "${ANTHROPIC_OAUTH_TOKEN}"
+# refresh_token = "${ANTHROPIC_OAUTH_REFRESH_TOKEN}"  # Optional
 ```
 
 ### Claude CLI
@@ -308,6 +363,38 @@ default_model = "claude-cli/opus"  # or claude-cli/sonnet, claude-cli/haiku
 ```
 
 No API key configuration needed - uses your existing Claude CLI authentication.
+
+### Gemini CLI
+
+If you have the `gemini` CLI installed, LocalGPT can use it directly:
+
+```toml
+[agent]
+default_model = "gemini-cli/gemini-3.1-pro-preview"  # or gemini-3.1-flash
+```
+
+No API key configuration needed - uses your existing Gemini CLI authentication.
+
+### Codex CLI
+
+If you have the `codex` CLI installed, LocalGPT can use it directly:
+
+```toml
+[agent]
+default_model = "codex-cli/gpt-4o"
+```
+
+No API key configuration needed - uses your existing Codex CLI authentication.
+
+### GitHub Copilot
+
+```toml
+[agent]
+default_model = "github-copilot/gpt-4o"
+
+[providers.github_copilot]
+access_token = "${GITHUB_COPILOT_TOKEN}"
+```
 
 ### Ollama (Local)
 
@@ -346,7 +433,7 @@ Follow the browser prompts to authenticate. This automatically configures your c
 Then use:
 ```toml
 [agent]
-default_model = "gemini/gemini-2.0-flash"  # or gemini-1.5-pro, etc.
+default_model = "gemini/gemini-3.1-pro-preview"  # or gemini-3.1-flash, etc.
 ```
 
 **Legacy API Key:**
@@ -354,6 +441,19 @@ default_model = "gemini/gemini-2.0-flash"  # or gemini-1.5-pro, etc.
 ```toml
 [providers.gemini_oauth]
 # Not yet supported via simple API key config, use OAuth flow above.
+```
+
+### OpenAI-Compatible Provider (OpenRouter, DeepSeek, Groq, etc.)
+
+For external services that speak the OpenAI API (e.g., OpenRouter, DeepSeek, Groq):
+
+```toml
+[agent]
+default_model = "openai-compatible/deepseek-coder"
+
+[providers.openai_compatible]
+api_key = "${OPENROUTER_API_KEY}"
+base_url = "https://openrouter.ai/api/v1"
 ```
 
 ### Local OpenAI-Compatible Server (LM Studio, llamafile, etc.)

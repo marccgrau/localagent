@@ -37,6 +37,18 @@
 # Claude CLI (local, no API key needed):
 #   - "claude-cli/opus", "claude-cli/sonnet", "claude-cli/haiku"
 #
+# Gemini CLI (local, no API key needed):
+#   - "gemini-cli/gemini-3.1-pro-preview", "gemini-cli/gemini-3.1-flash"
+#
+# Codex CLI (local, no API key needed):
+#   - "codex-cli/gpt-4o", "codex-cli/o1"
+#
+# GitHub Copilot (requires OAuth):
+#   - "github-copilot/gpt-4o"
+#
+# OpenAI Compatible (requires base_url):
+#   - "openai-compatible/deepseek-coder"
+#
 # Ollama (local):
 #   - "ollama/llama3", "ollama/mistral", etc.
 #
@@ -89,6 +101,27 @@ base_url = "https://api.anthropic.com"
 # [providers.claude_cli]
 # command = "claude"
 # model = "opus"  # opus, sonnet, or haiku
+
+# Gemini CLI configuration (uses local gemini CLI command)
+# Requires gemini CLI to be installed: https://github.com/google/gemini-cli
+# [providers.gemini_cli]
+# command = "gemini"
+# model = "gemini-3.1-pro-preview"
+
+# Codex CLI configuration (uses local codex CLI command)
+# Requires codex CLI to be installed
+# [providers.codex_cli]
+# command = "codex"
+# model = "gpt-4o"
+
+# GitHub Copilot configuration (OAuth)
+# [providers.github_copilot]
+# access_token = "${GITHUB_COPILOT_TOKEN}"
+
+# Generic OpenAI-compatible provider (OpenRouter, DeepSeek, Groq, etc.)
+# [providers.openai_compatible]
+# api_key = "${OPENROUTER_API_KEY}"
+# base_url = "https://openrouter.ai/api/v1"
 
 # GLM / Z.AI configuration (optional)
 # Get your API key at: https://z.ai/manage-apikey/apikey-list

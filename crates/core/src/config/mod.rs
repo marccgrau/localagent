@@ -839,7 +839,7 @@ fn default_gemini_cli_command() -> String {
     "gemini".to_string()
 }
 fn default_gemini_cli_model() -> String {
-    "gemini-2.0-flash".to_string()
+    "gemini-3.1-pro-preview".to_string()
 }
 fn default_codex_cli_command() -> String {
     "codex".to_string()

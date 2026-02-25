@@ -113,12 +113,14 @@ pub fn create_cli_tools(config: &Config) -> Result<Vec<Box<dyn Tool>>> {
             state_dir.clone(),
         )),
         Box::new(WriteFileTool::new(
+            workspace.clone(),
             state_dir.clone(),
             sandbox_policy.clone(),
             file_filter.clone(),
             allowed_dirs.clone(),
         )),
         Box::new(EditFileTool::new(
+            workspace,
             state_dir,
             sandbox_policy,
             file_filter,
@@ -390,6 +392,7 @@ impl Tool for ReadFileTool {
 
 // Write File Tool
 pub struct WriteFileTool {
+    workspace: PathBuf,
     state_dir: PathBuf,
     sandbox_policy: Option<SandboxPolicy>,
     filter: CompiledToolFilter,
@@ -398,12 +401,14 @@ pub struct WriteFileTool {
 
 impl WriteFileTool {
     pub fn new(
+        workspace: PathBuf,
         state_dir: PathBuf,
         sandbox_policy: Option<SandboxPolicy>,
         filter: CompiledToolFilter,
         allowed_directories: Vec<PathBuf>,
     ) -> Self {
         Self {
+            workspace,
             state_dir,
             sandbox_policy,
             filter,
@@ -476,9 +481,11 @@ impl Tool for WriteFileTool {
         }
 
         // Check protected files
-        if let Some(name) = real_path.file_name().and_then(|n| n.to_str())
-            && security::is_workspace_file_protected(name)
-        {
+        if security::is_path_protected(
+            &real_path.to_string_lossy(),
+            &self.workspace,
+            &self.state_dir,
+        ) {
             let detail = format!("Agent attempted write to {}", real_path.display());
             let _ = security::append_audit_entry_with_detail(
                 &self.state_dir,
@@ -513,6 +520,7 @@ impl Tool for WriteFileTool {
 
 // Edit File Tool
 pub struct EditFileTool {
+    workspace: PathBuf,
     state_dir: PathBuf,
     sandbox_policy: Option<SandboxPolicy>,
     filter: CompiledToolFilter,
@@ -521,12 +529,14 @@ pub struct EditFileTool {
 
 impl EditFileTool {
     pub fn new(
+        workspace: PathBuf,
         state_dir: PathBuf,
         sandbox_policy: Option<SandboxPolicy>,
         filter: CompiledToolFilter,
         allowed_directories: Vec<PathBuf>,
     ) -> Self {
         Self {
+            workspace,
             state_dir,
             sandbox_policy,
             filter,
@@ -611,9 +621,11 @@ impl Tool for EditFileTool {
         }
 
         // Check protected files
-        if let Some(name) = real_path.file_name().and_then(|n| n.to_str())
-            && security::is_workspace_file_protected(name)
-        {
+        if security::is_path_protected(
+            &real_path.to_string_lossy(),
+            &self.workspace,
+            &self.state_dir,
+        ) {
             let detail = format!("Agent attempted edit to {}", real_path.display());
             let _ = security::append_audit_entry_with_detail(
                 &self.state_dir,

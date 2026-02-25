@@ -157,20 +157,22 @@ impl Paths {
         self.state_dir.join("logs")
     }
 
-    /// PID file (in runtime_dir, falls back to state_dir)
-    pub fn pid_file(&self) -> PathBuf {
+    /// Locks directory (for PID and lock files)
+    pub fn locks_dir(&self) -> PathBuf {
         self.runtime_dir
             .as_ref()
             .unwrap_or(&self.state_dir)
-            .join("daemon.pid")
+            .join("locks")
     }
 
-    /// Workspace lock file (in runtime_dir, falls back to state_dir)
+    /// PID file
+    pub fn pid_file(&self) -> PathBuf {
+        self.locks_dir().join("daemon.pid")
+    }
+
+    /// Workspace lock file
     pub fn workspace_lock(&self) -> PathBuf {
-        self.runtime_dir
-            .as_ref()
-            .unwrap_or(&self.state_dir)
-            .join("workspace.lock")
+        self.locks_dir().join("workspace.lock")
     }
 
     /// Telegram pairing file
@@ -182,8 +184,10 @@ impl Paths {
     pub fn bridge_socket_name(&self) -> String {
         #[cfg(unix)]
         {
-            let dir = self.runtime_dir.as_ref().unwrap_or(&self.state_dir);
-            dir.join("bridge.sock").to_string_lossy().to_string()
+            self.locks_dir()
+                .join("bridge.sock")
+                .to_string_lossy()
+                .to_string()
         }
         #[cfg(windows)]
         {
@@ -219,19 +223,24 @@ impl Paths {
 
     /// Create all directories with appropriate permissions.
     pub fn ensure_dirs(&self) -> Result<()> {
-        let dirs = [
+        let logs_dir = self.logs_dir();
+        let locks_dir = self.locks_dir();
+        let mut dirs = vec![
             &self.config_dir,
             &self.data_dir,
             &self.state_dir,
             &self.cache_dir,
+            &self.workspace,
+            &logs_dir,
+            &locks_dir,
         ];
 
-        for dir in &dirs {
-            create_dir_with_mode(dir)?;
+        if let Some(ref runtime) = self.runtime_dir {
+            dirs.push(runtime);
         }
 
-        if let Some(ref runtime) = self.runtime_dir {
-            create_dir_with_mode(runtime)?;
+        for dir in dirs {
+            create_dir_with_mode(dir)?;
         }
 
         Ok(())

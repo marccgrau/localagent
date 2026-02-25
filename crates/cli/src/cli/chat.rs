@@ -486,11 +486,18 @@ pub async fn run(args: ChatArgs, agent_id: &str) -> Result<()> {
                                     // Print tool call as it starts (including recursive calls)
                                     let detail = extract_tool_detail(name, args);
                                     if let Some(ref d) = detail {
-                                        println!("\n[{}: {}]", name, d);
+                                        print!("\n> Running tool: {} ({}) ... ", name, d);
                                     } else {
-                                        println!("\n[{}]", name);
+                                        print!("\n> Running tool: {} ... ", name);
                                     }
-                                    let _ = stdout.flush();
+                                    let _ = std::io::stdout().flush();
+                                },
+                                |_name, result| {
+                                    match result {
+                                        Ok(_) => print!("Done."),
+                                        Err(e) => print!("Failed: {}", e),
+                                    }
+                                    let _ = std::io::stdout().flush();
                                 },
                             )
                             .await

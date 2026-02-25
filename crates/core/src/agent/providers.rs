@@ -560,7 +560,7 @@ pub fn create_provider(model: &str, config: &Config) -> Result<Box<dyn LLMProvid
                 - xai/grok-3-mini\n  \
                 - glm/glm-4.7\n  \
                 - claude-cli/opus, claude-cli/sonnet\n  \
-                - gemini-cli/gemini-2.0-flash\n  \
+                - gemini-cli/gemini-3.1-pro-preview\n  \
                 - ollama/llama3, ollama/mistral\n  \
                 - openai-compat/<model> (OpenRouter, DeepSeek, Groq, etc.)\n\n\
                 Or use aliases: opus, sonnet, haiku, gpt, gpt-mini, grok, glm",
